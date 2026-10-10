@@ -1,0 +1,7 @@
+# Generated video and raw frames. These are large and can be rebuilt.
+*.mkv
+*.mp4
+*.webm
+*.avi
+*.mov
+*.raw
