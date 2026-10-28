@@ -1,0 +1,11 @@
+Pictures in order: plain, text, chart, gravel. 120 frames each.
+Cut finder mismatches: 0. Cuts: [120, 240, 360].
+Chosen strength is the highest CRF whose 8 settled frames still score at least 90.
+Zoned file: 184159 bytes.
+One strength for every picture, CRF 30: 192568 bytes.
+Strength taken from the first picture only, CRF 44: 64935 bytes.
+
+plain: CRF 44, zoned sample 97.43, worst frame in that picture 97.43 at frame 0
+text: CRF 31, zoned sample 91.06, worst frame in that picture 91.04 at frame 120
+chart: CRF 34, zoned sample 91.49, worst frame in that picture 91.43 at frame 240
+gravel: CRF 30, zoned sample 90.16, worst frame in that picture 90.12 at frame 360

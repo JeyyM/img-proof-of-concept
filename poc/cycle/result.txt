@@ -1,0 +1,32 @@
+Cycling plain, text, chart, gravel every 20 frames. 11 cycles, 880 frames.
+Cut finder mismatches: 0. Cuts: 43.
+Chosen strength is the highest CRF whose 8 settled frames still score at least 90.
+Final zone encode (zoned): 1793543 bytes, x264 3.75 s, wall 3.75 s.
+One strength everywhere, CRF 28: 1929745 bytes.
+Harshest single strength, CRF 44: 403836 bytes.
+File score, 9th-worst: zoned 90.27, CRF 28 90.27, CRF 44 36.52.
+
+plain: CRF [44], sample 97.43 to 97.43, worst frame 97.43 at frame 0
+text: CRF [30], sample 90.38 to 90.38, worst frame 90.38 at frame 38
+chart: CRF [33], sample 90.91 to 90.91, worst frame 90.82 at frame 40
+gravel: CRF [28], sample 90.27 to 90.29, worst frame 90.27 at frame 65
+
+Brightness sum, five passes, median is the middle run:
+pairs 879 mismatches 0 pixels 589824
+plain_c median 0.249407 runs 0.245226 0.246198 0.249407 0.251476 0.253408
+autovectorized_c median 0.115126 runs 0.111966 0.112629 0.115126 0.123193 0.131705
+avx2_asm median 0.032265 runs 0.029517 0.032028 0.032265 0.035690 0.039128
+
+x264 encode times (seconds from the encoder's own frame rate):
+uniform-28: encode 3.54 s, wall 3.54 s, 1929745 bytes
+uniform-32: encode 3.56 s, wall 3.56 s, 1418021 bytes
+uniform-36: encode 3.25 s, wall 3.25 s, 998981 bytes
+uniform-40: encode 3.49 s, wall 3.49 s, 649901 bytes
+uniform-44: encode 3.60 s, wall 3.60 s, 403836 bytes
+uniform-29: encode 3.66 s, wall 3.66 s, 1798468 bytes
+uniform-30: encode 3.51 s, wall 3.51 s, 1666899 bytes
+uniform-31: encode 3.41 s, wall 3.41 s, 1539769 bytes
+uniform-33: encode 3.51 s, wall 3.51 s, 1307590 bytes
+uniform-34: encode 3.42 s, wall 3.42 s, 1196922 bytes
+uniform-35: encode 3.72 s, wall 3.72 s, 1095441 bytes
+zoned: encode 3.75 s, wall 3.75 s, 1793543 bytes

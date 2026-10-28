@@ -5,6 +5,9 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>
+#include <io.h>
 #include <windows.h>
 
 static uint64_t sad_scalar(const uint8_t *a, const uint8_t *b, size_t n) {
@@ -72,10 +75,15 @@ int main(int argc, char **argv) {
     }
     npix = (size_t)width * (size_t)height;
     limit = 2ull * (uint64_t)npix;
-    in = fopen(argv[3], "rb");
-    if (!in) {
-        perror(argv[3]);
-        return 2;
+    if (strcmp(argv[3], "-") == 0) {
+        _setmode(_fileno(stdin), _O_BINARY);
+        in = stdin;
+    } else {
+        in = fopen(argv[3], "rb");
+        if (!in) {
+            perror(argv[3]);
+            return 2;
+        }
     }
     prev = (uint8_t *)malloc(npix);
     curr = (uint8_t *)malloc(npix);
@@ -120,6 +128,8 @@ int main(int argc, char **argv) {
             frame, mismatches, scalar_sec, avx_sec, asm_sec);
     free(prev);
     free(curr);
-    fclose(in);
+    if (in != stdin) {
+        fclose(in);
+    }
     return mismatches == 0 ? 0 : 1;
 }
