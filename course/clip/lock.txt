@@ -1,5 +1,5 @@
 seed: 20261010
-draw: poc/study/draws.csv first row, title.png
+draw: title.png, first draw of seed 20261010
 start: 538
 hold: 20
 size: 1920x1080

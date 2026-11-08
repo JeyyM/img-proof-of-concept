@@ -1,7 +1,7 @@
 """Official development clip: 1920x1080, 30 fps, 900 frames.
 
-The text start is the first row already written in poc/study/draws.csv
-(seed 20261010). This script does not move that start. The eight spread-out
+The text start is frame 538, the first draw of seed 20261010 for title.png.
+This script does not move that start. The eight spread-out
 frame numbers are written only after the reference file exists.
 """
 
