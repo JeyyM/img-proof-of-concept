@@ -5,3 +5,7 @@
 *.avi
 *.mov
 *.raw
+
+# Viewer cache and clips built from the upload page.
+ui/cache/
+ui/built/
