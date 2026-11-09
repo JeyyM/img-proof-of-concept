@@ -22,7 +22,7 @@ The clock is the sum only. Five runs, and the table keeps the median.
 | brightness_compiler_c | 0.537 s | 2.35× against ordinary |
 | brightness_avx2 | 0.137 s | 3.91× against the compiler |
 
-One full VMAF pass of clip 01 at the settled CRF, CRF 31, took 22.0 s. It is in the timing table so the sum can be seen beside the score. It is not a speedup. Encoding time is not in the table. The rows are in `clips/timing.csv`.
+Encoding time is not in the table. The rows are in `clips/timing.csv`.
 
 ## The official clips
 

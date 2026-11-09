@@ -1,24 +1,31 @@
-"""Decode clip 01 once and write the three cut lists."""
+"""
+Runs the 3 kernels and writes the cut lists to a file
+Inputs gray frames from FFMPEG and outputs cut lists to a file
+"""
 
 import subprocess
 import threading
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-COURSE = Path(__file__).resolve().parent
+SRC = Path(__file__).resolve().parent
 FFMPEG = Path(
     r"C:\Users\asus\AppData\Local\Programs\Python\Python313\Lib\site-packages"
     r"\imageio_ffmpeg\binaries\ffmpeg-win-x86_64-v7.1.exe"
 )
 GCC = Path(r"C:\winlibs\mingw64\bin\gcc.exe")
 NASM = Path(r"C:\winlibs\mingw64\bin\nasm.exe")
-BUILD = COURSE / "build"
-EXE = BUILD / "list_cuts.exe"
+BUILD = SRC / "build"
+CUT_FINDER = BUILD / "list_cuts.exe"
 CLIP = ROOT / "clips" / "01.mkv"
+CHUNK = 1 << 20
 
 
-def compile_lister():
+def compile_cut_finder():
+    """Build list_cuts.exe from the C loop, compiled twice, and the assembly."""
     BUILD.mkdir(parents=True, exist_ok=True)
+
+    # Ordinary C. The vectorizer is off, so the loop stays one pixel at a time.
     subprocess.run(
         [
             str(GCC), "-O2", "-fno-tree-vectorize", "-fno-tree-slp-vectorize",
@@ -27,6 +34,9 @@ def compile_lister():
         ],
         check=True,
     )
+
+    # C with auto-vectorization on. -fno-tree-vectorize and -fno-tree-slp-vectorize are left off.
+    # The vectorizer rewrites the one-pixel loop so one instruction handles many pixels.
     subprocess.run(
         [
             str(GCC), "-O2", "-mavx2", "-ftree-vectorize",
@@ -35,6 +45,8 @@ def compile_lister():
         ],
         check=True,
     )
+
+    # AVX2 assembly loop: that does 32 pixels per instruction
     subprocess.run(
         [
             str(NASM), "-f", "win64",
@@ -43,10 +55,11 @@ def compile_lister():
         ],
         check=True,
     )
+
     subprocess.run(
         [
-            str(GCC), "-O2", "-mavx2", "-o", str(EXE),
-            str(COURSE / "list_cuts.c"),
+            str(GCC), "-O2", "-mavx2", "-o", str(CUT_FINDER),
+            str(SRC / "list_cuts.c"),
             str(BUILD / "brightness_ordinary_c.o"),
             str(BUILD / "brightness_compiler_c.o"),
             str(BUILD / "brightness_avx2.o"),
@@ -55,53 +68,65 @@ def compile_lister():
     )
 
 
+def pass_frames(ffmpeg, cut_finder):
+    """Pass the frames from FFMPEG to list_cuts"""
+    try:
+        while True:
+            chunk = ffmpeg.stdout.read(CHUNK)
+            if not chunk:
+                break
+            cut_finder.stdin.write(chunk)
+    finally:
+        cut_finder.stdin.close()
+        ffmpeg.stdout.close()
+
+
+def read_pipe(pipe, pieces):
+    """Read one finished pipe. The pieces list is shared with the main thread."""
+    pieces.append(pipe.read())
+
+
 def main():
-    compile_lister()
-    ff = subprocess.Popen(
-        [str(FFMPEG), "-hide_banner", "-loglevel", "error", "-i", str(CLIP), "-f", "rawvideo", "-pix_fmt", "gray", "-"],
+    compile_cut_finder()
+
+    # Gray bytes on stdout. One byte per pixel, 1920 by 1080.
+    ffmpeg = subprocess.Popen(
+        [
+            str(FFMPEG), "-hide_banner", "-loglevel", "error",
+            "-i", str(CLIP),
+            "-f", "rawvideo", "-pix_fmt", "gray", "-",
+        ],
         stdout=subprocess.PIPE,
     )
-    det = subprocess.Popen(
-        [str(EXE), "1920", "1080"],
+    cut_finder = subprocess.Popen(
+        [str(CUT_FINDER), "1920", "1080"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
 
-    def pump():
-        try:
-            while True:
-                chunk = ff.stdout.read(1 << 20)
-                if not chunk:
-                    break
-                det.stdin.write(chunk)
-        finally:
-            det.stdin.close()
-            ff.stdout.close()
-
-    out = []
-    err = []
+    # All three pipes have to be serviced together, or one of them fills and stalls.
+    printed = []
+    errors = []
     threads = [
-        threading.Thread(target=pump),
-        threading.Thread(target=lambda: out.append(det.stdout.read())),
-        threading.Thread(target=lambda: err.append(det.stderr.read())),
+        threading.Thread(target=pass_frames, args=(ffmpeg, cut_finder)),
+        threading.Thread(target=read_pipe, args=(cut_finder.stdout, printed)),
+        threading.Thread(target=read_pipe, args=(cut_finder.stderr, errors)),
     ]
     for thread in threads:
         thread.start()
     for thread in threads:
         thread.join()
-    det.wait()
-    ff.wait()
-    text = b"".join(out).decode("utf-8")
-    if det.returncode != 0:
-        raise SystemExit(b"".join(err).decode("utf-8", "replace") or f"list_cuts exited {det.returncode}")
-    dest = ROOT / "clips" / "cuts.txt"
-    dest.write_text(
-        "Clip clips/01.mkv, the agenda slide and the article. A cut is the first frame of a run whose mean absolute luma difference exceeds 2.\n"
-        "The three kernels were run on the same decoded frames. The lists are the frames each kernel marked.\n"
-        + text,
-        encoding="utf-8",
-    )
+    cut_finder.wait()
+    ffmpeg.wait()
+
+    text = b"".join(printed).decode("utf-8")
+    if cut_finder.returncode != 0:
+        message = b"".join(errors).decode("utf-8", "replace")
+        raise SystemExit(message or f"list_cuts exited {cut_finder.returncode}")
+
+    cuts_file = ROOT / "clips" / "cuts.txt"
+    cuts_file.write_text(text, encoding="utf-8")
     print(text)
 
 

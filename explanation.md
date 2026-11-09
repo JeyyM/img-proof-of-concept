@@ -103,8 +103,6 @@ GCC widens the bytes in the compiler build. It does not emit the SAD instruction
 
 The current medians, from `clips/timing.csv`, are 1.259 s for plain C, 0.537 s for the compiler (2.35× against plain), and 0.137 s for AVX2 (3.91× against the compiler). Pairs 899, mismatches 0. A new run of `src/time_table.py` replaces those medians with a fresh measurement.
 
-The same run also times one full VMAF pass of `clips/work/01/encodes/crf31.mp4`, the settled file for clip 01. That pass took 22.0 s. It includes reading both videos, on 8 threads. It is stored on the `vmaf_one_pass` row so the sum can be seen beside the score. It is not a speedup.
-
 `src/list_cuts.c` is the same three kernels with the clock left off. `src/publish_cuts.py` runs it on clip 01 and writes `clips/cuts.txt`. All three lists are `538 558`.
 
 `src/detect.c` is a different program. `clips/run_system.py` uses it to mark cuts on all 18 clips. Inside it are `brightness_ordinary_c`, an intrinsic AVX2 loop, and a call to `brightness_avx2`. It checks that those three agree, prints one CSV row per pair, and accumulates a per-pair time on its status line. That accumulated time is not the course table. The course table is the single clock in `time_kernel.c`.

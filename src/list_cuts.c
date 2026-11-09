@@ -97,10 +97,11 @@ int main(int argument_count, char **arguments) {
     pixel_count = (size_t)width * (size_t)height;
     cut_line = 2 * pixel_count;
 
-    /* FFmpeg pipes raw bytes. Text mode on Windows would change them. */
+    // makes windows receive the videos as the bytes they are from FFMPEG
+    // rather than turning it into text
     _setmode(_fileno(stdin), _O_BINARY);
 
-    /* Two frame buffers are enough. They trade places after every pair. */
+    // reserve memory for the frames
     previous_frame = (uint8_t *)malloc(pixel_count);
     current_frame = (uint8_t *)malloc(pixel_count);
     if (!previous_frame || !current_frame) {
@@ -108,7 +109,7 @@ int main(int argument_count, char **arguments) {
         return 2;
     }
 
-    /* The first frame has no frame before it, so it only fills previous_frame. */
+    // For reading the first frame which as no previous frame yet
     if (fread(previous_frame, 1, pixel_count, stdin) != pixel_count) {
         fprintf(stderr, "need at least one frame\n");
         return 2;
@@ -120,17 +121,15 @@ int main(int argument_count, char **arguments) {
         uint64_t ordinary_sum = brightness_ordinary_c(previous_frame, current_frame, pixel_count);
         uint64_t compiler_sum = brightness_compiler_c(previous_frame, current_frame, pixel_count);
         uint64_t assembly_sum = brightness_avx2(previous_frame, current_frame, pixel_count);
-        uint8_t *held_frame;                /* keeps one buffer while the two pointers swap */
-
-        /* The second frame of the pair. Pair 1 is frame 1, so this
-           count is also the number of pairs at the end of the loop. */
+        uint8_t *held_frame; // for holding the address of the frame to be swapped later
         frame++;
+
         /* The three kernels should return the same sum. */
         if (ordinary_sum != compiler_sum || ordinary_sum != assembly_sum) {
             mismatches++;
         }
 
-        /* Store the frame only when this pair is the first one above the cut line. */
+        /* Store the frame number when a cut is detected */
         mark_cut(ordinary_cuts, &ordinary_count, &ordinary_in_a_run, frame, ordinary_sum > cut_line);
         mark_cut(compiler_cuts, &compiler_count, &compiler_in_a_run, frame, compiler_sum > cut_line);
         mark_cut(assembly_cuts, &assembly_count, &assembly_in_a_run, frame, assembly_sum > cut_line);
@@ -147,7 +146,6 @@ int main(int argument_count, char **arguments) {
     print_cuts("brightness_compiler_c", compiler_cuts, compiler_count);
     print_cuts("brightness_avx2", assembly_cuts, assembly_count);
 
-    /* Both buffers are finished. */
     free(previous_frame);
     free(current_frame);
     /* 0 when the three sums agreed on every pair. */

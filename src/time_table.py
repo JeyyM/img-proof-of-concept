@@ -1,9 +1,7 @@
-"""Time the brightness sum on clip 01, then one full VMAF pass.
+"""Build the three brightness kernels and time each sum.
 
-Clip 01 is the agenda slide and the article, built from images/simple and
-images/dense. The sum is timed after the frames are in memory. Reading the
-clip is outside that clock. The VMAF figure is the whole score command,
-including reading both videos. It is one pass of the settled file, CRF 31.
+The kernel clock starts after the frames are in memory. The three medians
+are written to the timing table.
 """
 
 import subprocess
@@ -11,8 +9,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CLIPS = ROOT / "clips"
-REFERENCE = CLIPS / "01.mkv"
-SETTLED = CLIPS / "work" / "01" / "encodes" / "crf31.mp4"
+# One clip is enough for the clock. Every clip is the same size, so the kernel
+# does the same work on each. This file is the agenda slide and the article.
+TIMING_CLIP = CLIPS / "01.mkv"
 FFMPEG = Path(
     r"C:\Users\asus\AppData\Local\Programs\Python\Python313\Lib\site-packages"
     r"\imageio_ffmpeg\binaries\ffmpeg-win-x86_64-v7.1.exe"
@@ -21,16 +20,20 @@ GCC = Path(r"C:\winlibs\mingw64\bin\gcc.exe")
 NASM = Path(r"C:\winlibs\mingw64\bin\nasm.exe")
 SRC = ROOT / "src"
 BUILD = Path(__file__).resolve().parent / "build"
-WIDTH, HEIGHT, FRAMES = 1920, 1080, 900
+WIDTH, HEIGHT, FRAME_COUNT = 1920, 1080, 900
 
 
-def gcc(args):
-    subprocess.run([str(GCC), *args], check=True)
+# Run one GCC command and stop if the compiler fails.
+def compile_with_gcc(arguments):
+    subprocess.run([str(GCC), *arguments], check=True)
 
 
-def build():
+# Compile the C loop twice and assemble the handwritten loop, then link the clock.
+def compile_clock():
     BUILD.mkdir(parents=True, exist_ok=True)
-    gcc(
+
+    # Ordinary C. The vectorizer is off, so the loop stays one pixel at a time.
+    compile_with_gcc(
         [
             "-O2",
             "-fno-tree-vectorize",
@@ -42,7 +45,9 @@ def build():
             str(SRC / "brightness_c.c"),
         ]
     )
-    gcc(
+
+    # C with auto-vectorization on. -fno-tree-vectorize and -fno-tree-slp-vectorize are left off.
+    compile_with_gcc(
         [
             "-O2",
             "-mavx2",
@@ -54,6 +59,8 @@ def build():
             str(SRC / "brightness_c.c"),
         ]
     )
+
+    # AVX2 assembly loop: that does 32 pixels per instruction
     subprocess.run(
         [
             str(NASM), "-f", "win64",
@@ -62,7 +69,8 @@ def build():
         ],
         check=True,
     )
-    gcc(
+
+    compile_with_gcc(
         [
             "-O2",
             "-mavx2",
@@ -76,15 +84,17 @@ def build():
     )
 
 
-def time_kernel():
-    ff = subprocess.Popen(
+# Turn the clip into gray frames and time the three sums.
+# Reading the clip is outside the kernel clock.
+def run_clock():
+    ffmpeg = subprocess.Popen(
         [
             str(FFMPEG),
             "-hide_banner",
             "-loglevel",
             "error",
             "-i",
-            str(REFERENCE),
+            str(TIMING_CLIP),
             "-f",
             "rawvideo",
             "-pix_fmt",
@@ -93,61 +103,29 @@ def time_kernel():
         ],
         stdout=subprocess.PIPE,
     )
-    proc = subprocess.run(
-        [str(BUILD / "time_kernel.exe"), str(WIDTH), str(HEIGHT), str(FRAMES)],
-        stdin=ff.stdout,
+    result = subprocess.run(
+        [str(BUILD / "time_kernel.exe"), str(WIDTH), str(HEIGHT), str(FRAME_COUNT)],
+        stdin=ffmpeg.stdout,
         capture_output=True,
         text=True,
     )
-    ff.stdout.close()
-    ff.wait()
-    if proc.returncode != 0:
-        raise SystemExit(proc.stderr or proc.stdout)
-    print(proc.stdout, end="")
-    return proc.stdout
+    ffmpeg.stdout.close()
+    ffmpeg.wait()
+    if result.returncode != 0:
+        raise SystemExit(result.stderr or result.stdout)
+    print(result.stdout, end="")
+    return result.stdout
 
 
-def time_vmaf():
-    log_dir = CLIPS / "work" / "01" / "timing"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / "vmaf_pass.json"
-    if log_path.exists():
-        log_path.unlink()
-    print("vmaf pass", flush=True)
-    proc = subprocess.run(
-        [
-            str(FFMPEG),
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-i",
-            str(SETTLED),
-            "-i",
-            str(REFERENCE),
-            "-lavfi",
-            "[0:v]format=yuv420p,setpts=PTS-STARTPTS[dist];"
-            "[1:v]format=yuv420p,setpts=PTS-STARTPTS[ref];"
-            f"[dist][ref]libvmaf=log_fmt=json:log_path={log_path.name}:n_subsample=1:n_threads=8",
-            "-f",
-            "null",
-            "-",
-        ],
-        cwd=log_dir,
-        capture_output=True,
-        text=True,
-    )
-    if proc.returncode != 0:
-        raise SystemExit(proc.stderr)
-    return None
-
-
-def parse_kernel(text):
+# Turn the clock's printed lines into one row per kernel.
+# A kernel line is: name, the word median, the median, the word runs, then five times.
+def read_clock_report(text):
     rows = []
-    header = None
+    check_line = None
     for line in text.splitlines():
         parts = line.split()
         if parts[0] == "pairs":
-            header = parts
+            check_line = parts
             continue
         rows.append(
             {
@@ -156,57 +134,66 @@ def parse_kernel(text):
                 "runs_s": " ".join(parts[4:]),
             }
         )
-    return header, rows
+    return check_line, rows
 
 
-def main():
-    build()
-    text = time_kernel()
-    header, rows = parse_kernel(text)
-    import time
-
-    start = time.perf_counter()
-    time_vmaf()
-    elapsed = time.perf_counter() - start
-    rows.append({"method": "vmaf_one_pass", "median_s": f"{elapsed:.6f}", "runs_s": f"{elapsed:.6f}"})
-    by_name = {row["method"]: float(row["median_s"]) for row in rows}
-    plain = by_name["brightness_ordinary_c"]
-    compiler = by_name["brightness_compiler_c"]
-    out = CLIPS / "timing.csv"
-    with out.open("w", encoding="utf-8", newline="") as handle:
+# Write the medians, the five runs, and the speedups.
+# Ordinary C has no speedup against the compiler.
+def write_timing_table(rows, ordinary_median, compiler_median):
+    timing_file = CLIPS / "timing.csv"
+    medians = {row["method"]: float(row["median_s"]) for row in rows}
+    with timing_file.open("w", encoding="utf-8", newline="") as handle:
         handle.write("method,median_s,runs_s,speedup_vs_ordinary,speedup_vs_compiler\n")
         for row in rows:
             name = row["method"]
-            median = by_name[name]
-            versus_plain = "" if name == "vmaf_one_pass" else f"{plain / median:.4f}"
-            versus_compiler = ""
-            if name not in ("brightness_ordinary_c", "vmaf_one_pass"):
-                versus_compiler = f"{compiler / median:.4f}"
+            median = medians[name]
+            speedup_vs_ordinary = f"{ordinary_median / median:.4f}"
+            speedup_vs_compiler = ""
+            if name != "brightness_ordinary_c":
+                speedup_vs_compiler = f"{compiler_median / median:.4f}"
             handle.write(
-                f"{name},{row['median_s']},{row['runs_s']},{versus_plain},{versus_compiler}\n"
+                f"{name},{row['median_s']},{row['runs_s']},{speedup_vs_ordinary},{speedup_vs_compiler}\n"
             )
+    return timing_file
+
+
+# Write the note that says what each row of the timing table is.
+def write_timing_note(check_line, ordinary_median, compiler_median, assembly_median):
     note = CLIPS / "timing.txt"
     note.write_text(
         "\n".join(
             [
-                "Clip: clips/01.mkv, agenda slide and article, 1920x1080, 900 frames, 899 pairs.",
+                f"Clip: {TIMING_CLIP.relative_to(ROOT).as_posix()}, agenda slide and article, 1920x1080, 900 frames, 899 pairs.",
                 "brightness_ordinary_c: src/brightness_c.c, compiled -O2 with the vectorizer off.",
                 "brightness_compiler_c: the same source, compiled -O2 -mavx2 with the vectorizer on. GCC widened the bytes. It did not emit the SAD instruction.",
                 "brightness_avx2: src/brightness_avx2.asm, assembled with nasm -f win64, 32 bytes per vpsadbw. The clock covers the sum only, after frames are in memory.",
                 "Five passes each. The table keeps the median, and the runs are sorted.",
-                f"Speedup, compiler against plain: {plain / compiler:.2f}x.",
-                f"Speedup, AVX2 against compiler: {compiler / by_name['brightness_avx2']:.2f}x.",
+                f"Speedup, compiler against plain: {ordinary_median / compiler_median:.2f}x.",
+                f"Speedup, AVX2 against compiler: {compiler_median / assembly_median:.2f}x.",
                 "Encoding time is not in this table.",
-                "vmaf_one_pass: one libvmaf score of clips/work/01/encodes/crf31.mp4, 8 threads, including reading both videos. It is not a speedup.",
-                f"Kernel check: {' '.join(header)}.",
+                f"Kernel check: {' '.join(check_line)}.",
                 "Cut lists, one per kernel: clips/cuts.txt.",
                 "",
             ]
         ),
         encoding="utf-8",
     )
-    print(f"wrote {out}")
-    print(f"vmaf_one_pass {elapsed:.6f}")
+
+
+# Build the clock, time the kernels, and save the table.
+def main():
+    compile_clock()
+    report = run_clock()
+    check_line, rows = read_clock_report(report)
+
+    medians = {row["method"]: float(row["median_s"]) for row in rows}
+    ordinary_median = medians["brightness_ordinary_c"]
+    compiler_median = medians["brightness_compiler_c"]
+    assembly_median = medians["brightness_avx2"]
+
+    timing_file = write_timing_table(rows, ordinary_median, compiler_median)
+    write_timing_note(check_line, ordinary_median, compiler_median, assembly_median)
+    print(f"wrote {timing_file}")
 
 
 if __name__ == "__main__":

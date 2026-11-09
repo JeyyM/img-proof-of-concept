@@ -6,6 +6,5 @@ Five passes each. The table keeps the median, and the runs are sorted.
 Speedup, compiler against plain: 2.35x.
 Speedup, AVX2 against compiler: 3.91x.
 Encoding time is not in this table.
-vmaf_one_pass: one libvmaf score of clips/work/01/encodes/crf31.mp4, 8 threads, including reading both videos. It is not a speedup.
 Kernel check: pairs 899 mismatches 0 pixels 2073600.
 Cut lists, one per kernel: clips/cuts.txt.

@@ -1,5 +1,3 @@
-Clip clips/01.mkv, the agenda slide and the article. A cut is the first frame of a run whose mean absolute luma difference exceeds 2.
-The three kernels were run on the same decoded frames. The lists are the frames each kernel marked.
 pairs 899 mismatches 0
 brightness_ordinary_c 538 558
 brightness_compiler_c 538 558
