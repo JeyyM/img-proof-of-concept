@@ -217,14 +217,14 @@ def prepare_picture(upload, dest):
 
 
 def score_folder(folder, reference):
-    run_system.compile_detect()
+    run_system.compile_cut_finder()
     drawn = run_system.random_frames()
     crossings, easy_share, _kernel = run_system.crossings_of(reference)
     settled = run_system.settled_frames(crossings)
     on_cut = run_system.cut_frames(crossings)
     detail = run_system.detail_frames(reference, crossings)
     votes = {
-        "spread": run_system.EVEN,
+        "spread": run_system.REGULAR_INTERVAL,
         "settled": settled,
         "cut": on_cut,
         "random": drawn,
@@ -232,7 +232,7 @@ def score_folder(folder, reference):
     }
     encode_dir = folder / "encodes"
     score_dir = folder / "scores"
-    rows = run_system.measure(reference, encode_dir, score_dir, run_system.COARSE, [], votes)
+    rows = run_system.measure(reference, encode_dir, score_dir, run_system.CRF_STRENGTHS, [], votes)
     while True:
         extra = run_system.bracket(rows)
         extra += run_system.missing_steps(rows, "spread")

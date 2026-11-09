@@ -55,7 +55,7 @@ clips/build_clips.py ──► clips/01.mkv … clips/18.mkv
                       └──► clips/log.csv
         │
         ├─ clips/run_system.py
-        │     nasm -f win64 on src/brightness_avx2.asm, links it with src/detect.c → src/detect.exe
+        │     compiles src/brightness_c.c twice, assembles src/brightness_avx2.asm, links src/list_cuts.c
         │     reads clips/log.csv and clips/random_frames.txt
         │     writes clips/work/NN/encodes/crf*.mp4
         │            clips/work/NN/scores/crf*.json
@@ -81,8 +81,6 @@ It does not run anything.
 
 `src/build/` appears when the timing script or the cut script compiles. It holds object files and executables. Deleting it loses nothing that the records do not already hold. The next run creates it again.
 
-`src/detect.exe` is the cut finder `clips/run_system.py` compiles. The course clock does not use it.
-
 ## The brightness sum
 
 The sum is the absolute change in luma of every pixel, added up, for one pair of frames. A frame has 2,073,600 pixels. A clip has 899 pairs.
@@ -103,9 +101,7 @@ GCC widens the bytes in the compiler build. It does not emit the SAD instruction
 
 The current medians, from `clips/timing.csv`, are 1.259 s for plain C, 0.537 s for the compiler (2.35× against plain), and 0.137 s for AVX2 (3.91× against the compiler). Pairs 899, mismatches 0. A new run of `src/time_table.py` replaces those medians with a fresh measurement.
 
-`src/list_cuts.c` is the same three kernels with the clock left off. `src/publish_cuts.py` runs it on clip 01 and writes `clips/cuts.txt`. All three lists are `538 558`.
-
-`src/detect.c` is a different program. `clips/run_system.py` uses it to mark cuts on all 18 clips. Inside it are `brightness_ordinary_c`, an intrinsic AVX2 loop, and a call to `brightness_avx2`. It checks that those three agree, prints one CSV row per pair, and accumulates a per-pair time on its status line. That accumulated time is not the course table. The course table is the single clock in `time_kernel.c`.
+`src/list_cuts.c` is the same three kernels with the clock left off. It prints the cut frames for each kernel and how many pairs stayed at or below the line. `src/publish_cuts.py` runs it on clip 01 and writes `clips/cuts.txt`. All three lists are `538 558`. `clips/run_system.py` runs the same program on all 18 clips. The quiet count becomes `easy_below_2` in `clips/decisions.csv`. The course table stays the single clock in `time_kernel.c`.
 
 ## How a CRF is chosen
 
@@ -190,10 +186,10 @@ python src/time_table.py
 What a second run does:
 
 - `build_clips.py` keeps a clip whose `.mkv` exists and whose log row says `built`. It encodes only a clip that is missing or not marked built. The page start in the log stays.
-- `run_system.py` compiles `detect.exe`, then skips any clip already present in `decisions.csv`. It does not rewrite that table unless it measures a clip that was not in it. Existing `crf*.mp4` and `crf*.json` files are reused.
+- `run_system.py` compiles `list_cuts.exe`, then skips any clip already present in `decisions.csv`. It does not rewrite that table unless it measures a clip that was not in it. Existing `crf*.mp4` and `crf*.json` files are reused.
 - `run_scenecut_on.py` skips clips already present in `decisions_scenecut.csv`.
 - `publish_cuts.py` decodes clip 01 and overwrites `clips/cuts.txt`.
-- `time_table.py` decodes clip 01, retimes the three kernels, retimes the one VMAF pass, and overwrites `clips/timing.csv` and `clips/timing.txt`. The new medians will not match the old ones digit for digit.
+- `time_table.py` decodes clip 01, retimes the three kernels, and overwrites `clips/timing.csv` and `clips/timing.txt`. The new medians will not match the old ones digit for digit.
 
 The viewer is optional and parked. From the repo root:
 

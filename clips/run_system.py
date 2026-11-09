@@ -1,15 +1,14 @@
-"""Picks a CRF for each practice clip (scene-cut turned off).
-
-The lossless clips are already built by build_clips.py. For each clip this
-script finds the cuts, encodes a bunch of CRFs, and gets the VMAF score of
-every frame. Then each rule picks the highest CRF where its 8 frames still
-score at least 90. If a clip is already in decisions.csv we just skip it.
+"""
+Picks a Compression Rate Factor (CRF) for each clip.
+Uses Video Multi-Method Assessment Fusion (VMAF) to score the frames and picks the 
+CRF that maximizes the VMAF score.
 """
 
 import csv
 import json
 import random
 import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -21,9 +20,7 @@ FFMPEG = Path(
     r"C:\Users\asus\AppData\Local\Programs\Python\Python313\Lib\site-packages"
     r"\imageio_ffmpeg\binaries\ffmpeg-win-x86_64-v7.1.exe"
 )
-GCC = Path(r"C:\winlibs\mingw64\bin\gcc.exe")
-NASM = Path(r"C:\winlibs\mingw64\bin\nasm.exe")
-DETECT = ROOT / "src" / "detect.exe"
+CUT_FINDER = ROOT / "src" / "build" / "list_cuts.exe"
 
 SEED = 20261010
 WIDTH, HEIGHT = 1920, 1080
@@ -31,9 +28,10 @@ TOTAL = 900  # frames per clip
 NPIX = WIDTH * HEIGHT
 TARGET = 90.0  # the VMAF score we want to stay above
 
-# 8 frames spaced out across the 900. the 20 frame page can fit in the gaps
-EVEN = (56, 168, 281, 393, 506, 618, 731, 843)
-COARSE = (28, 32, 36, 40, 44)
+# Eight frames on a regular interval across the 900. A 20-frame page fits in the gaps.
+REGULAR_INTERVAL = (56, 168, 281, 393, 506, 618, 731, 843)
+# The first CRF strengths to encode. A higher number is a smaller, rougher file.
+CRF_STRENGTHS = (28, 32, 36, 40, 44)
 RULES = ("spread", "settled", "cut", "random", "detail")
 
 
@@ -46,19 +44,14 @@ def run(args, cwd=None):
     )
 
 
-def compile_detect():
-    """Builds detect.exe (the cut finder). This one isn't used for the timing table."""
-    build = ROOT / "src" / "build"
-    build.mkdir(parents=True, exist_ok=True)
-    asm_obj = build / "brightness_avx2.o"
-    subprocess.run(
-        [str(NASM), "-f", "win64", "-o", str(asm_obj), str(ROOT / "src" / "brightness_avx2.asm")],
-        check=True,
-    )
-    subprocess.run(
-        [str(GCC), "-O2", "-mavx2", "-o", str(DETECT), str(ROOT / "src" / "detect.c"), str(asm_obj)],
-        check=True,
-    )
+def compile_cut_finder():
+    """Runs list_cuts.exe. The same three kernels as the clock and the cut list."""
+    source = ROOT / "src"
+    if str(source) not in sys.path:
+        sys.path.insert(0, str(source))
+    from publish_cuts import compile_cut_finder as build
+
+    build()
 
 
 def random_frames():
@@ -85,46 +78,34 @@ def random_frames():
     return tuple(chosen)
 
 
-def cuts_from_rows(rows):
-    """A cut = the first frame where the brightness change goes above 2.
-
-    If a few frames in a row are above 2, only the first one counts.
-    Also returns how many frames were quiet (not above 2) as a fraction.
-    """
-    cuts = []
-    in_run = False
-    for frame, _sad, above in rows:
-        if above and not in_run:
-            cuts.append(frame)
-        in_run = bool(above)
-    quiet = sum(1 for row in rows if not row[2])
-    return cuts, quiet / len(rows)
-
-
 def crossings_of(clip):
-    """Decodes the clip to grayscale and pipes it into detect.exe to find the cuts."""
+    """Decodes the clip to grayscale and pipes it into list_cuts.exe.
+
+    The cut frames are the first frame of each run above 2. quiet_share is
+    the fraction of pairs at or below that line, stored as easy_below_2.
+    """
     ff = subprocess.Popen(
         [str(FFMPEG), "-hide_banner", "-loglevel", "error",
          "-i", str(clip), "-f", "rawvideo", "-pix_fmt", "gray", "-"],
         stdout=subprocess.PIPE,
     )
-    det = subprocess.Popen(
-        [str(DETECT), str(WIDTH), str(HEIGHT), "-"],
+    finder = subprocess.Popen(
+        [str(CUT_FINDER), str(WIDTH), str(HEIGHT)],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
 
     def pump():
-        # copy ffmpeg output into detect.exe, 1MB at a time
+        # copy ffmpeg output into list_cuts.exe, 1MB at a time
         try:
             while True:
                 chunk = ff.stdout.read(1 << 20)
                 if not chunk:
                     break
-                det.stdin.write(chunk)
+                finder.stdin.write(chunk)
         finally:
-            det.stdin.close()
+            finder.stdin.close()
             ff.stdout.close()
 
     out = []
@@ -132,28 +113,42 @@ def crossings_of(clip):
     # had to use threads here, otherwise the pipes fill up and everything freezes
     threads = [
         threading.Thread(target=pump),
-        threading.Thread(target=lambda: out.append(det.stdout.read())),
-        threading.Thread(target=lambda: err.append(det.stderr.read())),
+        threading.Thread(target=lambda: out.append(finder.stdout.read())),
+        threading.Thread(target=lambda: err.append(finder.stderr.read())),
     ]
     for t in threads:
         t.start()
     for t in threads:
         t.join()
-    det.wait()
+    finder.wait()
     ff.wait()
 
     err_text = b"".join(err).decode("utf-8", "replace").strip()
-    if det.returncode not in (0, None):
-        raise SystemExit(err_text or f"detect exited {det.returncode}")
+    if finder.returncode not in (0, None):
+        raise SystemExit(err_text or f"list_cuts exited {finder.returncode}")
 
-    rows = []
-    lines = b"".join(out).decode("utf-8").splitlines()
-    for line in lines[1:]:  # skip the header
-        frame, sad, above = line.split(",")
-        rows.append((int(frame), int(sad), int(above)))
+    pairs = None
+    quiet = None
+    cuts_by_kernel = {}
+    for line in b"".join(out).decode("utf-8").splitlines():
+        parts = line.split()
+        if not parts:
+            continue
+        if parts[0] == "pairs":
+            pairs = int(parts[1])
+            quiet = int(parts[5])
+            status = line
+            continue
+        cuts_by_kernel[parts[0]] = [int(frame) for frame in parts[1:]]
 
-    cuts, quiet_share = cuts_from_rows(rows)
-    return cuts, quiet_share, err_text
+    names = ("brightness_ordinary_c", "brightness_compiler_c", "brightness_avx2")
+    lists = [cuts_by_kernel[name] for name in names]
+    if lists[0] != lists[1] or lists[0] != lists[2]:
+        raise SystemExit("cut lists disagree")
+    if not pairs:
+        raise SystemExit("list_cuts did not report any pairs")
+
+    return lists[2], quiet / pairs, status
 
 
 def frames_from(crossings, offset):
@@ -360,7 +355,7 @@ def votes_for(reference, drawn):
     """Makes the 5 sets of 8 frames, one per rule. (We don't use the page start from the log.)"""
     crossings, quiet_share, kernel = crossings_of(reference)
     votes = {
-        "spread": EVEN,
+        "spread": REGULAR_INTERVAL,
         "settled": settled_frames(crossings),
         "cut": cut_frames(crossings),
         "random": drawn,
@@ -370,8 +365,8 @@ def votes_for(reference, drawn):
 
 
 def fill_ladder(reference, encode_dir, score_dir, votes):
-    """Does the coarse CRFs first, then keeps filling in CRFs until nothing new is needed."""
-    rows = measure(reference, encode_dir, score_dir, COARSE, [], votes)
+    """Encodes CRF_STRENGTHS first, then fills in the strengths between a pass and a miss."""
+    rows = measure(reference, encode_dir, score_dir, CRF_STRENGTHS, [], votes)
     while True:
         extra = bracket(rows)
         extra += missing_steps(rows, "spread")
@@ -434,7 +429,7 @@ def load_decisions(path):
 
 
 def main():
-    compile_detect()
+    compile_cut_finder()
     drawn = random_frames()
     print("random frames", drawn, flush=True)
 

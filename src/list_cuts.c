@@ -63,6 +63,7 @@ int main(int argument_count, char **arguments) {
     
     // for mismatch detection of the 3 methods
     int mismatches = 0;          // pairs where the three sums disagree
+    int quiet = 0;               // pairs at or below the line, the easy_below_2 count
 
     // for storing the frames marked by the 3 methods
     int ordinary_cuts[MAX_CUTS];
@@ -134,14 +135,19 @@ int main(int argument_count, char **arguments) {
         mark_cut(compiler_cuts, &compiler_count, &compiler_in_a_run, frame, compiler_sum > cut_line);
         mark_cut(assembly_cuts, &assembly_count, &assembly_in_a_run, frame, assembly_sum > cut_line);
 
+        /* A pair at or below the line is quiet. run_system.py turns this into easy_below_2. */
+        if (assembly_sum <= cut_line) {
+            quiet++;
+        }
+
         /* The frame just read becomes the previous frame. */
         held_frame = previous_frame;
         previous_frame = current_frame;
         current_frame = held_frame;
     }
 
-    /* "pairs 899 mismatches 0", then one cut line per kernel. */
-    printf("pairs %d mismatches %d\n", frame, mismatches);
+    /* "pairs 899 mismatches 0 quiet 897", then one cut line per kernel. */
+    printf("pairs %d mismatches %d quiet %d\n", frame, mismatches, quiet);
     print_cuts("brightness_ordinary_c", ordinary_cuts, ordinary_count);
     print_cuts("brightness_compiler_c", compiler_cuts, compiler_count);
     print_cuts("brightness_avx2", assembly_cuts, assembly_count);

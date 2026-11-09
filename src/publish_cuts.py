@@ -120,13 +120,13 @@ def main():
     cut_finder.wait()
     ffmpeg.wait()
 
-    text = b"".join(printed).decode("utf-8")
+    text = b"".join(printed).decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
     if cut_finder.returncode != 0:
         message = b"".join(errors).decode("utf-8", "replace")
         raise SystemExit(message or f"list_cuts exited {cut_finder.returncode}")
 
     cuts_file = ROOT / "clips" / "cuts.txt"
-    cuts_file.write_text(text, encoding="utf-8")
+    cuts_file.write_text(text, encoding="utf-8", newline="\n")
     print(text)
 
 

@@ -106,7 +106,7 @@ def one_clip(meta, drawn):
     settled = frames_of(meta["settled_frames"])
     detail = frames_of(meta["detail_frames"])
     votes = {
-        "spread": rs.EVEN,
+        "spread": rs.REGULAR_INTERVAL,
         "settled": settled,
         "cut": rs.cut_frames(crossings),
         "random": drawn,
@@ -114,7 +114,7 @@ def one_clip(meta, drawn):
     }
     rows = load_rows(score_dir)
     print(f"clip {name} resume {len(rows)} rungs", flush=True)
-    rows = rs.measure(reference, encode_dir, score_dir, rs.COARSE, rows, votes)
+    rows = rs.measure(reference, encode_dir, score_dir, rs.CRF_STRENGTHS, rows, votes)
     while True:
         extra = rs.bracket(rows)
         extra += rs.missing_steps(rows, "spread")
