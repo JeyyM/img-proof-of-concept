@@ -157,11 +157,22 @@ def main():
     time_vmaf()
     elapsed = time.perf_counter() - start
     rows.append({"method": "vmaf_one_pass", "median_s": f"{elapsed:.6f}", "runs_s": f"{elapsed:.6f}"})
+    by_name = {row["method"]: float(row["median_s"]) for row in rows}
+    plain = by_name["plain_c"]
+    compiler = by_name["autovectorized_c"]
     out = CLIP / "timing.csv"
     with out.open("w", encoding="utf-8", newline="") as handle:
-        handle.write("method,median_s,runs_s\n")
+        handle.write("method,median_s,runs_s,speedup_vs_plain,speedup_vs_compiler\n")
         for row in rows:
-            handle.write(f"{row['method']},{row['median_s']},{row['runs_s']}\n")
+            name = row["method"]
+            median = by_name[name]
+            versus_plain = "" if name == "vmaf_one_pass" else f"{plain / median:.4f}"
+            versus_compiler = ""
+            if name not in ("plain_c", "vmaf_one_pass"):
+                versus_compiler = f"{compiler / median:.4f}"
+            handle.write(
+                f"{name},{row['median_s']},{row['runs_s']},{versus_plain},{versus_compiler}\n"
+            )
     note = CLIP / "timing.txt"
     note.write_text(
         "\n".join(
@@ -171,8 +182,12 @@ def main():
                 "autovectorized_c: the same loop, compiled -O2 -mavx2 with the vectorizer on. GCC widened the bytes. It did not emit the SAD instruction.",
                 "avx2_asm: src/sad_avx2.s, 32 bytes per vpsadbw. The clock covers the sum only, after frames are in memory.",
                 "Five passes each. The table keeps the median, and the runs are sorted.",
-                "vmaf_one_pass: one libvmaf score of encodes/crf30.mp4, 8 threads, including reading both videos.",
+                f"Speedup, compiler against plain: {plain / compiler:.2f}x.",
+                f"Speedup, AVX2 against compiler: {compiler / by_name['avx2_asm']:.2f}x.",
+                "Encoding time is not in this table.",
+                "vmaf_one_pass: one libvmaf score of encodes/crf30.mp4, 8 threads, including reading both videos. It is not a speedup.",
                 f"Kernel check: {' '.join(header)}.",
+                "Cut lists, one per kernel: course/clip/cuts.txt.",
                 "",
             ]
         ),

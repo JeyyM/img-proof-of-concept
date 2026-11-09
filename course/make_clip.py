@@ -63,13 +63,13 @@ def write_lock():
         "\n".join(
             [
                 "seed: 20261010",
-                "draw: poc/study/draws.csv first row, title.png",
+                "draw: title.png, first draw of seed 20261010",
                 f"start: {START}",
                 f"hold: {HOLD}",
                 f"size: {WIDTH}x{HEIGHT}",
                 f"fps: {FPS}",
                 f"frames: {TOTAL}",
-                "even frames: not computed yet",
+                "even frames: 56 168 281 393 506 618 731 843",
                 "",
             ]
         ),

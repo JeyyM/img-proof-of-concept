@@ -1,0 +1,6 @@
+Course clip course/clip/reference.mkv. A cut is the first frame of a run whose mean absolute luma difference exceeds 2.
+The three kernels were run on the same decoded frames. The lists are the frames each kernel marked.
+pairs 899 mismatches 0
+plain_c 538 558
+autovectorized_c 538 558
+avx2_asm 538 558

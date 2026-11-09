@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>The page between the samples, version 3</title>
+<style>
+  @page { size: letter; margin: 0.75in 0.8in 0.8in 0.8in; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    color: #1c1c1c;
+    font-size: 11.5pt;
+    line-height: 1.45;
+  }
+  h1 {
+    font-size: 18pt;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    margin: 0 0 8px;
+  }
+  .authors, .status {
+    text-align: center;
+    margin: 0;
+  }
+  .authors { font-size: 11.5pt; }
+  .status { color: #444; font-size: 10pt; font-style: italic; margin-top: 4px; }
+  h2 {
+    font-size: 13.5pt;
+    font-weight: 600;
+    margin: 1.15em 0 0.35em;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 12pt;
+    font-weight: 600;
+    margin: 0.9em 0 0.3em;
+    page-break-after: avoid;
+  }
+  p { margin: 0 0 0.7em; text-align: justify; hyphens: auto; }
+  .note {
+    border: 1px solid #b9a06a;
+    padding: 8px 12px;
+    margin: 14px 0 4px;
+    font-size: 10.5pt;
+    page-break-inside: avoid;
+  }
+  figure {
+    margin: 0.8em 0 1em;
+    page-break-inside: avoid;
+  }
+  figcaption {
+    font-size: 9.5pt;
+    color: #444;
+    margin-top: 4px;
+    text-align: left;
+  }
+  svg { width: 100%; height: auto; display: block; }
+  .legend { font-size: 9.5pt; color: #444; margin-top: 2px; }
+  .key { margin-right: 14px; }
+  .key i {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 4px;
+    vertical-align: baseline;
+  }
+  table.dense { font-size: 8pt; }
+  table.dense th, table.dense td { padding: 2px 3px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+    margin: 0.4em 0 0.2em;
+    page-break-inside: avoid;
+  }
+  th, td {
+    border-bottom: 1px solid #c8c8c8;
+    padding: 3px 5px;
+    vertical-align: top;
+  }
+  th {
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 1px solid #1c1c1c;
+  }
+  td.right, th.right { text-align: right; }
+  .refs p {
+    font-size: 10pt;
+    text-align: left;
+    margin: 0 0 0.45em;
+    padding-left: 1.6em;
+    text-indent: -1.6em;
+  }
+  a { color: inherit; text-decoration: none; }
+</style>
+</head>
+<body>
+  <h1>The page between the samples</h1>
+  <p class="authors">Juan Miguel Miranda, Jean Khladyn Stefanie Abarquez, and Kimberly Klaire Gamboa</p>
+  <p class="status">Version 3. The scene-cut-off result is unchanged. The same eighteen clips have been encoded again with x264's default scene-cut and keyframe interval. Not a held-out set, and not a viewer study.</p>
+
+  <div class="note">The numbers below are the 12 comparison clips in clips/decisions.csv. Six medium pages are reported separately and are not in the mean. Nothing here is the held-out half or a viewer study. Section 6.5 is the scene-cut-on encode of these same clips. Choices among CRFs use only rungs that encode actually produced.</div>
+
+  <h2>Abstract</h2>
+  <p>This paper measures which single x264 CRF is accepted when the vote can see only eight frames. The clips are constructed: one easy screen, then one dense page for twenty frames. The contribution is the file that gets chosen. Eight even frames miss the page. On all twelve comparison clips, the file they accept has its 9th-worst frame inside that page, 10.32 points below VMAF 90 on average. The 45th-worst frame of the same file stays outside the page and at or above 90. Those are two separate scores. The vote chooses the file. The 45th-worst is a score someone might report afterward. This paper does not claim that a product runs both.</p>
+  <p>Eight frames taken eight after the cut choose a gentler CRF, and that file’s 9th-worst VMAF is at least 90 on every comparison clip. Among the CRFs the ladder actually encoded, that CRF is also the highest whose 9th-worst of all 900 frames is still at least 90. The even-frame shortfall has median 8.47 and mean 10.32. A 10,000-draw bootstrap of the paired gap, seed 20261010, runs from 7.83 to 13.29. Keeping both clips of one easy picture together widens it to 7.35–14.74. The settled file is 27% larger on average, from 15% to 47%, about 46 KB. The claim has two encoder settings. With scene-cut off and a GOP longer than the clip, the even-frame mean shortfall is 10.32. With scene-cut left on, keyint 250 and scenecut 40, that mean is 3.18. The settled shortfall is zero on all twelve under the default encoder. One CRF still covers the whole file. The result is VMAF only.</p>
+
+  <h2>1. The agreement that is wrong</h2>
+  <p>A small sample can stand in for a clip, and a tail score can be used so the worst moments are not averaged away. On these clips both can land on the easy picture. The page is twenty frames of dense text. What the study measures there is a VMAF shortfall. It does not show that a person would fail to read the page.</p>
+  <p>The geometry is simple. At 30 frames per second, 900 frames is 30 seconds. Eight centers of equal bins fall at frames 56, 168, 281, 393, 506, 618, 731, and 843. The gap between neighbors is a little over a hundred frames, more than three seconds. A page held for 20 frames does not have to be hidden on purpose. If its start is drawn uniformly from frame 180 through frame 700, the range used in this study, 84.6% of those starts miss every even center. A hold of about 112 frames, the gap itself, almost never misses. A hold of 150 frames never does.</p>
+  <p>The score has the same hole. Sorted from worst to best, the 5th percentile of 900 frames is the 45th-worst. Twenty poor frames are fewer than forty-five, so that mark can sit on the easy picture. The 1st percentile is the 9th-worst. Twenty poor frames are enough to fill it. The two percentiles are not two views of one fact. One of them can see the page and the other cannot.</p>
+  <figure>
+    <svg viewBox="0 0 680 150" role="img">
+      <text x="36" y="14" font-size="11" fill="#444">Whole clip, 900 frames</text>
+      <rect x="36" y="28" width="620" height="18" fill="#e6e6e6"/>
+      <rect x="406.6" y="28" width="13.8" height="18" fill="#1f4b73"/>
+      <line x1="74.6" y1="28" x2="74.6" y2="52" stroke="#1c1c1c" stroke-width="1.4"/><line x1="151.7" y1="28" x2="151.7" y2="52" stroke="#1c1c1c" stroke-width="1.4"/><line x1="229.6" y1="28" x2="229.6" y2="52" stroke="#1c1c1c" stroke-width="1.4"/><line x1="306.7" y1="28" x2="306.7" y2="52" stroke="#1c1c1c" stroke-width="1.4"/><line x1="384.6" y1="28" x2="384.6" y2="52" stroke="#1c1c1c" stroke-width="1.4"/><line x1="461.7" y1="28" x2="461.7" y2="52" stroke="#1c1c1c" stroke-width="1.4"/><line x1="539.6" y1="28" x2="539.6" y2="52" stroke="#1c1c1c" stroke-width="1.4"/><line x1="616.7" y1="28" x2="616.7" y2="52" stroke="#1c1c1c" stroke-width="1.4"/>
+      <text x="36" y="62" font-size="10" fill="#444">0</text>
+      <text x="640" y="62" font-size="10" fill="#444">899</text>
+      <text x="36" y="86" font-size="11" fill="#444">Frames 480–640 of clip 01</text>
+      <rect x="36" y="96" width="620" height="26" fill="#e6e6e6"/>
+      <rect x="260.8" y="96" width="77.5" height="26" fill="#1f4b73"/>
+      <rect x="291.8" y="122" width="31.0" height="5" fill="#1c1c1c"/>
+      <text x="36" y="146" font-size="10" fill="#444">480</text>
+      <text x="260.8" y="146" font-size="10" fill="#1c1c1c">page 538</text>
+      <text x="630" y="146" font-size="10" fill="#444">640</text>
+    </svg>
+    <figcaption>Figure 1. Clip 01, an agenda slide cut to a Wikipedia article at frame 538 and back at frame 558. The tall marks are the eight even frames. None of them lands on the page. The accent bar is the 20-frame page. The dark strip under the zoom is the settled sample, frames 546–553. Source: clips/log.csv and the even-frame list computed after the file existed.</figcaption>
+  </figure>
+
+  <h2>2. How often the spread misses</h2>
+  <p>Figure 2 is calculated, not measured. For each hold length the start is every integer from 180 through 700 whose hold still ends by frame 899. A start is a hit if any of the eight even centers falls inside the hold. The curve is the reason for a 20-frame page. At that length the miss is the common case. The eighteen starts are the first eighteen draws of seed 20261010, taken before the files existed. Every one missed. None was discarded or redrawn. An 84.6% miss rate makes eighteen misses in a row uncommon and still plausible. That percentage is the design. Eighteen out of eighteen is not a rate measured in recordings.</p>
+  <figure>
+    <svg viewBox="0 0 680 250" role="img">
+<rect x="0" y="0" width="680" height="250" fill="#fff"/>
+<line x1="46" y1="214.0" x2="668" y2="214.0" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="217.0" text-anchor="end" font-size="10" fill="#444">0%</text>
+<line x1="46" y1="164.5" x2="668" y2="164.5" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="167.5" text-anchor="end" font-size="10" fill="#444">25%</text>
+<line x1="46" y1="115.0" x2="668" y2="115.0" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="118.0" text-anchor="end" font-size="10" fill="#444">50%</text>
+<line x1="46" y1="65.5" x2="668" y2="65.5" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="68.5" text-anchor="end" font-size="10" fill="#444">75%</text>
+<line x1="46" y1="16.0" x2="668" y2="16.0" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="19.0" text-anchor="end" font-size="10" fill="#444">100%</text>
+<line x1="46" y1="16" x2="46" y2="214" stroke="#1c1c1c" stroke-width="1"/>
+<line x1="46" y1="214" x2="668" y2="214" stroke="#1c1c1c" stroke-width="1"/>
+<rect x="83.4" y="28.1" width="14.0" height="185.9" fill="#1f4b73"/>
+<text x="90.4" y="236" text-anchor="middle" font-size="10" fill="#444">8</text>
+<rect x="172.3" y="46.5" width="14.0" height="167.5" fill="#1f4b73"/>
+<text x="179.3" y="236" text-anchor="middle" font-size="10" fill="#444">20</text>
+<rect x="261.1" y="80.2" width="14.0" height="133.8" fill="#1f4b73"/>
+<text x="268.1" y="236" text-anchor="middle" font-size="10" fill="#444">40</text>
+<rect x="350.0" y="118.2" width="14.0" height="95.8" fill="#1f4b73"/>
+<text x="357.0" y="236" text-anchor="middle" font-size="10" fill="#444">60</text>
+<rect x="438.9" y="175.2" width="14.0" height="38.8" fill="#1f4b73"/>
+<text x="445.9" y="236" text-anchor="middle" font-size="10" fill="#444">90</text>
+<rect x="527.7" y="213.2" width="14.0" height="0.8" fill="#1f4b73"/>
+<text x="534.7" y="236" text-anchor="middle" font-size="10" fill="#444">112</text>
+<rect x="616.6" y="214.0" width="14.0" height="0.0" fill="#1f4b73"/>
+<text x="623.6" y="236" text-anchor="middle" font-size="10" fill="#444">150</text>
+</svg><div class="legend"><span class="key"><i style="background:#1f4b73"></i>Starts that miss every even frame</span></div>
+    <figcaption>Figure 2. Calculated miss rate of eight even centers. The study’s page is the bar at 20 frames: 84.6% of legal starts miss every even frame.</figcaption>
+  </figure>
+
+  <h2>3. What this is, and what it is next to</h2>
+  <p>Shot cuts have been found from pixel differences for a long time. A hard cut is the easy case: the brightness of the frame jumps, and a small threshold separates it from a still [6]. This paper uses that comparison as a clock, not as a new detector. Frames are numbered from 0. The cut is the first frame of a run whose mean absolute luma difference from the previous frame, measured on the gray decode of the lossless reference, exceeds 2 on 8-bit levels. The page is that frame and the next 19. For clip 01 the cut is frame 538 and the page is frames 538–557. The settled sample starts eight frames after the cut and takes the next eight frames of the same picture, so clip 01 uses frames 546–553. The cut frame is not in that sample. The wait is there because the jump frame itself is a poor thing to score.</p>
+  <p>VMAF scores frames one by one and already warns that a mean hides the tail [1]. Its own pooling can take a percentile [2]. On a clip this long the 5th percentile is still coarser than a 20-frame hole. Three scores are kept apart. The vote is the minimum of eight sampled VMAF numbers, and it chooses the CRF. The file score is the 9th-worst of the 900 frame scores, the 1st percentile of a clip of this length. It was fixed from the page length before these scores existed: twenty frames can fill nine places in that sorted list, and they cannot fill forty-five. The 45th-worst, about the 5th percentile, is reported so the coarser mark can be seen. It does not choose the CRF. The 9th-worst does not choose it either.</p>
+  <p>The encoder is x264 at one constant rate factor for the whole file [3]. A higher CRF is a smaller, rougher file. Scene-cut detection is off and the group of pictures is longer than the clip, so the cut is not handed a fresh keyframe. That is a choice of the experiment. It is also the setting a reviewer can most fairly call artificial, and it is named as such in the limits. No other codec, preset, or rate-control mode was compared, and the page was not given its own CRF. Subjective methods exist for the question a viewer would actually be asked [4], [5]. No viewer was shown these files. MS-SSIM and PSNR were not run [7]. VMAF 90 is the score that was used. It is not a reading score.</p>
+
+  <h2>4. The clips and the choice</h2>
+  <p>Each clip is 1920×1080, 30 frames per second, exactly 900 frames. It holds one easy screen picture, cuts to one dense page for exactly 20 frames, and cuts back. There is no fade. The easy pictures in the comparison set are flat screen graphics with large type and open space: an agenda slide, an empty dashboard, an empty editor, a section divider, a geometric desktop, and a one-line editor on a geometric wallpaper. Each is used twice. The dense pages are a Wikipedia article, a page of C, a protocol article, language documentation, a population table, and a terminal listing. Six further clips replace the easy picture with a busier but still readable screen: a status page, a word processor, a kanban board, a sound panel, a file manager, and an appearance panel. Those six are the boundary. They stay out of the mean.</p>
+  <p>The reference is a lossless long-GOP encode, so repeated frames stay small and the pixels match the stills. The decision encode in sections 5 and 6.1 through 6.4 is libx264, preset medium, yuv420p, scene-cut off, keyframe interval longer than the clip. Section 6.5 repeats the same ladder with those restrictions omitted. The ladder starts at CRF 28, 32, 36, 40, and 44. If every stored 9th-worst is still at least 90, the next rung is two higher, stopping at 42. If every stored 9th-worst is below 90, the next rung is two lower, stopping at 18. Then, for the even-frame vote and the settled vote, every integer CRF strictly between the highest encoded CRF whose vote is still at least 90 and the next encoded CRF above it is encoded, and that fill is repeated until the gap is one. A rule keeps the highest encoded CRF whose own vote is still at least 90. If no encoded rung qualifies, that rule has no file. Odd values in the table, such as 31 and 37, are those filled integers. The choice is the highest qualifying rung among the ones encoded. On several clips the even-frame vote is not perfectly monotone as CRF rises, so a CRF outside that filled gap could still have cleared 90. The study is about which single CRF is accepted. It does not move bits onto the page. Votes are indexes into one saved list of 900 scores. Scoring a rule reads eight stored numbers. It does not replace the full pass, which was computed for the file score. Finding the cut also reads every frame. Eight against eight compares which frames may vote. It does not compare compute. Both sides of VMAF are converted to yuv420p. A 4:4:4 encode was not compared, so chroma subsampling is not separated from the CRF.</p>
+  <p>Five ways of spending the eight frames are scored from that list. Even frames, ignoring the picture. Eight frames starting eight after the cut. Eight frames starting on the cut. Eight random frames from one draw, seed 20261010, written down before scoring: 196, 353, 297, 306, 110, 775, 94, and 695. And the eight frames of highest luma variance on the uncompressed picture. On a still hold, that last rule lands on whichever of the two pictures is more detailed, and then takes eight identical frames of it.</p>
+  <p>The cut finder was run as ordinary C, as the same C with the compiler free to vectorize, and as AVX2. The three cut lists matched on every clip. That check is the course work. It is not the result of this paper. The paper does not claim that choosing the frames is fast. The three kernels and one VMAF pass were timed. The rest of the path, from decode through the CRF search, was not. One VMAF pass on this machine took about 21 seconds, and the brightness sum took well under a second. Those two numbers are not a pipeline benchmark.</p>
+
+  <h2>5. What the spread file looks like</h2>
+  <p>Figure 3 is clip 01 at the CRF the even frames chose, CRF 36. Through the easy slide the score sits near 92. At frame 538, the cut onto the article, it drops to about 82 and stays there for the twenty frames of text. At frame 558 it returns to about 91. The settled sample, frames 546–553, sits in the dip. The nearest even frames are 506 and 618, both on the slide. The 9th-worst frame of this file is frame 548, inside the page, at 81.9. The 45th-worst is frame 687, on the slide, at 91.7.</p>
+  <figure>
+    <svg viewBox="0 0 680 250" role="img">
+      <rect width="680" height="250" fill="#fff"/>
+      <line x1="40" y1="218.0" x2="668" y2="218.0" stroke="#c8c8c8"/><text x="34" y="221.0" text-anchor="end" font-size="10" fill="#444">75</text><line x1="40" y1="169.9" x2="668" y2="169.9" stroke="#c8c8c8"/><text x="34" y="172.9" text-anchor="end" font-size="10" fill="#444">80</text><line x1="40" y1="121.8" x2="668" y2="121.8" stroke="#c8c8c8"/><text x="34" y="124.8" text-anchor="end" font-size="10" fill="#444">85</text><line x1="40" y1="73.7" x2="668" y2="73.7" stroke="#c8c8c8"/><text x="34" y="76.7" text-anchor="end" font-size="10" fill="#444">90</text><line x1="40" y1="25.6" x2="668" y2="25.6" stroke="#c8c8c8"/><text x="34" y="28.6" text-anchor="end" font-size="10" fill="#444">95</text>
+      <line x1="40" y1="73.7" x2="668" y2="73.7" stroke="#2c6b4a" stroke-dasharray="4 3"/>
+      <text x="666" y="69.7" text-anchor="end" font-size="10" fill="#2c6b4a">90</text>
+      <polyline fill="none" stroke="#8d3b3b" stroke-width="1.6" points="40.0,51.8 55.7,52.0 71.4,52.1 87.1,52.3 102.8,52.4 118.5,52.4 134.2,52.4 149.9,52.4 165.6,52.4 181.3,52.4 197.0,152.8 212.7,152.4 228.4,156.2 244.1,152.8 259.8,153.5 275.5,152.6 291.2,151.7 306.9,151.4 322.6,151.4 338.3,151.5 354.0,151.7 369.7,151.6 385.4,151.5 401.1,151.6 416.8,151.6 432.5,151.5 448.2,151.5 463.9,151.5 479.6,151.6 495.3,151.7 511.0,58.3 526.7,58.3 542.4,58.9 558.1,57.9 573.8,57.7 589.5,57.8 605.2,57.8 620.9,57.7 636.6,57.4 652.3,57.4 668.0,57.3"/>
+      <line x1="40" y1="16" x2="40" y2="218" stroke="#1c1c1c"/>
+      <line x1="40" y1="218" x2="668" y2="218" stroke="#1c1c1c"/>
+      <text x="71.4" y="238" text-anchor="middle" font-size="10" fill="#444">530</text><text x="228.4" y="238" text-anchor="middle" font-size="10" fill="#444">540</text><text x="385.4" y="238" text-anchor="middle" font-size="10" fill="#444">550</text><text x="542.4" y="238" text-anchor="middle" font-size="10" fill="#444">560</text>
+    </svg>
+    <figcaption>Figure 3. Frame-by-frame VMAF, clip 01, CRF 36, frames 528–568. The page is frames 538–557. Source: clips/work/01/scores/crf36.json.</figcaption>
+  </figure>
+  <p>That pattern is the whole comparison set, not one lucky clip. On the spread-chosen file of each of the twelve, the 9th-worst frame is inside the twenty-frame page, and the 45th-worst frame is outside it. Every 45th-worst score is still above 90. A reader who published the 5th percentile would report a pass. A reader who opened the page would not.</p>
+
+  <h2>6. Results</h2>
+  <h3>6.1 Even frames against settled frames</h3>
+  <p>The settled rule clears 90 on every comparison clip. The even rule does not clear it on any of them. The mean of the twelve shortfalls is 10.32. They run from 3.72, a geometric desktop against a terminal listing, to 20.69, an empty editor against language documentation. The median is 8.47. Two clips near 20, that editor against a protocol page and against the documentation, pull the mean up. The bootstrap interval above resamples these twelve rows. Resampling the six easy pictures instead, both clips of a picture kept together, 10,000 times with the same seed, puts the mean between 7.35 and 14.74. The pictures repeat, so the twelve rows are not twelve independent draws. Neither interval is a confidence interval for a larger population, and neither is the held-out test.</p>
+  <figure>
+    <svg viewBox="0 0 680 250" role="img">
+<rect x="0" y="0" width="680" height="250" fill="#fff"/>
+<line x1="46" y1="214.0" x2="668" y2="214.0" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="217.0" text-anchor="end" font-size="10" fill="#444">0</text>
+<line x1="46" y1="164.5" x2="668" y2="164.5" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="167.5" text-anchor="end" font-size="10" fill="#444">6</text>
+<line x1="46" y1="115.0" x2="668" y2="115.0" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="118.0" text-anchor="end" font-size="10" fill="#444">12</text>
+<line x1="46" y1="65.5" x2="668" y2="65.5" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="68.5" text-anchor="end" font-size="10" fill="#444">18</text>
+<line x1="46" y1="16.0" x2="668" y2="16.0" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="19.0" text-anchor="end" font-size="10" fill="#444">24</text>
+<line x1="46" y1="16" x2="46" y2="214" stroke="#1c1c1c" stroke-width="1"/>
+<line x1="46" y1="214" x2="668" y2="214" stroke="#1c1c1c" stroke-width="1"/>
+<rect x="64.9" y="147.1" width="14.0" height="66.9" fill="#8d3b3b"/>
+<text x="71.9" y="236" text-anchor="middle" font-size="10" fill="#444">01</text>
+<rect x="116.8" y="144.5" width="14.0" height="69.5" fill="#8d3b3b"/>
+<text x="123.8" y="236" text-anchor="middle" font-size="10" fill="#444">02</text>
+<rect x="168.6" y="45.5" width="14.0" height="168.5" fill="#8d3b3b"/>
+<text x="175.6" y="236" text-anchor="middle" font-size="10" fill="#444">03</text>
+<rect x="220.4" y="143.8" width="14.0" height="70.2" fill="#8d3b3b"/>
+<text x="227.4" y="236" text-anchor="middle" font-size="10" fill="#444">04</text>
+<rect x="272.2" y="154.4" width="14.0" height="59.6" fill="#8d3b3b"/>
+<text x="279.2" y="236" text-anchor="middle" font-size="10" fill="#444">05</text>
+<rect x="324.1" y="149.3" width="14.0" height="64.7" fill="#8d3b3b"/>
+<text x="331.1" y="236" text-anchor="middle" font-size="10" fill="#444">06</text>
+<rect x="375.9" y="145.9" width="14.0" height="68.1" fill="#8d3b3b"/>
+<text x="382.9" y="236" text-anchor="middle" font-size="10" fill="#444">07</text>
+<rect x="427.8" y="135.4" width="14.0" height="78.6" fill="#8d3b3b"/>
+<text x="434.8" y="236" text-anchor="middle" font-size="10" fill="#444">08</text>
+<rect x="479.6" y="43.3" width="14.0" height="170.7" fill="#8d3b3b"/>
+<text x="486.6" y="236" text-anchor="middle" font-size="10" fill="#444">09</text>
+<rect x="531.4" y="128.9" width="14.0" height="85.1" fill="#8d3b3b"/>
+<text x="538.4" y="236" text-anchor="middle" font-size="10" fill="#444">10</text>
+<rect x="583.2" y="183.3" width="14.0" height="30.7" fill="#8d3b3b"/>
+<text x="590.2" y="236" text-anchor="middle" font-size="10" fill="#444">11</text>
+<rect x="635.1" y="125.1" width="14.0" height="88.9" fill="#8d3b3b"/>
+<text x="642.1" y="236" text-anchor="middle" font-size="10" fill="#444">12</text>
+</svg><div class="legend"><span class="key"><i style="background:#8d3b3b"></i>Even frames</span></div>
+    <figcaption>Figure 4. Shortfall of the even-frame file below VMAF 90. Settled shortfall is 0 on every comparison clip. Source: clips/decisions.csv.</figcaption>
+  </figure>
+  <table><thead><tr><th>Clip</th><th>Pages</th><th>Even CRF</th><th>Settled CRF</th><th>Even 9th</th><th>Settled 9th</th><th>Even shortfall</th><th>Size</th></tr></thead><tbody><tr><td class="left">01</td><td class="left">Agenda / article</td><td class="right">36</td><td class="right">31</td><td class="right">81.9</td><td class="right">90.3</td><td class="right">8.11</td><td class="right">+38%</td></tr><tr><td class="left">02</td><td class="left">Dashboard / source</td><td class="right">37</td><td class="right">32</td><td class="right">81.6</td><td class="right">90.6</td><td class="right">8.43</td><td class="right">+25%</td></tr><tr><td class="left">03</td><td class="left">Editor / protocol</td><td class="right">40</td><td class="right">31</td><td class="right">69.6</td><td class="right">90.5</td><td class="right">20.42</td><td class="right">+47%</td></tr><tr><td class="left">04</td><td class="left">Section / docs</td><td class="right">36</td><td class="right">31</td><td class="right">81.5</td><td class="right">91.4</td><td class="right">8.51</td><td class="right">+20%</td></tr><tr><td class="left">05</td><td class="left">Grid / table</td><td class="right">35</td><td class="right">30</td><td class="right">82.8</td><td class="right">90.8</td><td class="right">7.23</td><td class="right">+19%</td></tr><tr><td class="left">06</td><td class="left">Editor desktop / terminal</td><td class="right">37</td><td class="right">32</td><td class="right">82.2</td><td class="right">90.5</td><td class="right">7.84</td><td class="right">+17%</td></tr><tr><td class="left">07</td><td class="left">Agenda / source</td><td class="right">37</td><td class="right">32</td><td class="right">81.7</td><td class="right">90.2</td><td class="right">8.26</td><td class="right">+31%</td></tr><tr><td class="left">08</td><td class="left">Dashboard / protocol</td><td class="right">36</td><td class="right">31</td><td class="right">80.5</td><td class="right">90.0</td><td class="right">9.53</td><td class="right">+19%</td></tr><tr><td class="left">09</td><td class="left">Editor / docs</td><td class="right">40</td><td class="right">31</td><td class="right">69.3</td><td class="right">91.3</td><td class="right">20.69</td><td class="right">+41%</td></tr><tr><td class="left">10</td><td class="left">Section / table</td><td class="right">36</td><td class="right">30</td><td class="right">79.7</td><td class="right">91.2</td><td class="right">10.31</td><td class="right">+28%</td></tr><tr><td class="left">11</td><td class="left">Grid / terminal</td><td class="right">35</td><td class="right">32</td><td class="right">86.3</td><td class="right">90.5</td><td class="right">3.72</td><td class="right">+15%</td></tr><tr><td class="left">12</td><td class="left">Editor desktop / article</td><td class="right">37</td><td class="right">31</td><td class="right">79.2</td><td class="right">90.2</td><td class="right">10.77</td><td class="right">+26%</td></tr></tbody></table>
+  <p class="status" style="text-align:left;margin-top:2px">Table 1. Comparison set. Even shortfall is 90 minus the 9th-worst VMAF of the even-frame file. It is not the settled score minus the even score. Size is the settled file against the even-frame file.</p>
+  <p>The settled CRF is 5.7 CRF units lower on average. The twelve differences are 5, 5, 9, 5, 5, 5, 5, 5, 9, 6, 3, and 6. The file grows by 45,927 bytes on average. Target 80, scored the same way and not used to choose, still fails on four of the twelve spread files, clips 03, 09, 10, and 12. Their mean shortfall at 80, taken over all twelve, is 1.85. The settled files have a 9th-worst VMAF of at least 80 on every clip.</p>
+  <figure>
+    <svg viewBox="0 0 680 250" role="img">
+<rect x="0" y="0" width="680" height="250" fill="#fff"/>
+<line x1="46" y1="214.0" x2="668" y2="214.0" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="217.0" text-anchor="end" font-size="10" fill="#444">0%</text>
+<line x1="46" y1="164.5" x2="668" y2="164.5" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="167.5" text-anchor="end" font-size="10" fill="#444">12%</text>
+<line x1="46" y1="115.0" x2="668" y2="115.0" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="118.0" text-anchor="end" font-size="10" fill="#444">25%</text>
+<line x1="46" y1="65.5" x2="668" y2="65.5" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="68.5" text-anchor="end" font-size="10" fill="#444">38%</text>
+<line x1="46" y1="16.0" x2="668" y2="16.0" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="19.0" text-anchor="end" font-size="10" fill="#444">50%</text>
+<line x1="46" y1="16" x2="46" y2="214" stroke="#1c1c1c" stroke-width="1"/>
+<line x1="46" y1="214" x2="668" y2="214" stroke="#1c1c1c" stroke-width="1"/>
+<rect x="64.9" y="61.5" width="14.0" height="152.5" fill="#3e5166"/>
+<text x="71.9" y="236" text-anchor="middle" font-size="10" fill="#444">01</text>
+<rect x="116.8" y="117.0" width="14.0" height="97.0" fill="#3e5166"/>
+<text x="123.8" y="236" text-anchor="middle" font-size="10" fill="#444">02</text>
+<rect x="168.6" y="28.3" width="14.0" height="185.7" fill="#3e5166"/>
+<text x="175.6" y="236" text-anchor="middle" font-size="10" fill="#444">03</text>
+<rect x="220.4" y="134.8" width="14.0" height="79.2" fill="#3e5166"/>
+<text x="227.4" y="236" text-anchor="middle" font-size="10" fill="#444">04</text>
+<rect x="272.2" y="138.4" width="14.0" height="75.6" fill="#3e5166"/>
+<text x="279.2" y="236" text-anchor="middle" font-size="10" fill="#444">05</text>
+<rect x="324.1" y="147.9" width="14.0" height="66.1" fill="#3e5166"/>
+<text x="331.1" y="236" text-anchor="middle" font-size="10" fill="#444">06</text>
+<rect x="375.9" y="92.4" width="14.0" height="121.6" fill="#3e5166"/>
+<text x="382.9" y="236" text-anchor="middle" font-size="10" fill="#444">07</text>
+<rect x="427.8" y="139.2" width="14.0" height="74.8" fill="#3e5166"/>
+<text x="434.8" y="236" text-anchor="middle" font-size="10" fill="#444">08</text>
+<rect x="479.6" y="50.8" width="14.0" height="163.2" fill="#3e5166"/>
+<text x="486.6" y="236" text-anchor="middle" font-size="10" fill="#444">09</text>
+<rect x="531.4" y="102.7" width="14.0" height="111.3" fill="#3e5166"/>
+<text x="538.4" y="236" text-anchor="middle" font-size="10" fill="#444">10</text>
+<rect x="583.2" y="154.6" width="14.0" height="59.4" fill="#3e5166"/>
+<text x="590.2" y="236" text-anchor="middle" font-size="10" fill="#444">11</text>
+<rect x="635.1" y="112.6" width="14.0" height="101.4" fill="#3e5166"/>
+<text x="642.1" y="236" text-anchor="middle" font-size="10" fill="#444">12</text>
+</svg><div class="legend"><span class="key"><i style="background:#3e5166"></i>Extra bytes</span></div>
+    <figcaption>Figure 5. File-size cost of the settled choice on the comparison set.</figcaption>
+  </figure>
+  <p>A second choice ignores the eight-frame vote. It keeps the highest CRF already encoded whose 9th-worst of all 900 frames is still at least 90. On all twelve comparison clips that CRF is the settled CRF: 31, 32, 31, 31, 30, 32, 32, 31, 31, 30, 32, and 31, in clip order. The even-frame rule stops harsher on every clip. The settled file matches that full-list decision among the rungs that were encoded. It is not a claim about a CRF the ladder never encoded, and the 9th-worst is not offered as the only sensible objective. The 9th-worst frame of that file sits outside the eight voted frames on eight of the twelve clips, so the file score is not a restatement of the vote.</p>
+
+  <h3>6.2 The other ways to spend eight frames</h3>
+  <p>Random frames behave like even frames unless a drawn frame happens to land in the page. Two of the eight shared random frames do. Frame 230 falls in clip 03’s page, and the random rule there stops at CRF 36 instead of the even rule’s CRF 40. Frame 353 falls in clip 11’s page, and the random file then matches the settled file, shortfall zero. Across the twelve, that one draw has mean shortfall 9.00. A thousand further draws of eight distinct frames, scored on the CRFs already encoded and seeded by 20261010 plus the clip number, land in the page on 15% to 18% of tries. Their mean shortfall, averaged across the twelve clips, is 8.51. Ten of the clips sit from 3.15 to 9.04. Clips 03 and 09 stay at 15.7 and 17.0. The committed draw is one sample from that spread.</p>
+  <p>On these stills the eight-frame budget is the controlled comparison, not an optimized sampler. One frame, eight after the cut, picks the settled CRF on all twelve clips. The finding is which picture is sampled. One frame from each picture, frame 0 and that same page frame, does the same, because the easy frame stays high and the minimum is the page. Even frames are the check this study was built to stress. Highest luma variance, below, is a simple stand-in for picking the busier picture. Neither is offered as the sampler a production system would use. A wait of one, two, four, twelve, or sixteen frames after the cut also holds the 9th-worst at or above 90. On eleven clips those waits pick the settled CRF. Clip 08 picks CRF 30 at a wait of one or two, and CRF 31 from a wait of four upward. The locked wait of eight is not a tuned optimum. The jump frame is the sample that fails.</p>
+  <p>Frames that start on the cut match the settled file on the nine clips where a CRF still clears 90. On clips 04, 08, and 11 no rung does. At the CRF the even rule chose, the jump frame itself scores 0.0, 0.0, and 1.35. The next frame scores 81.4, 80.3, and 86.2. The minimum of a sample that includes the jump is the jump. On clip 04 the pixels of that jump frame are the page, not a shifted or destroyed frame, and VMAF still scores the frame 0. That is why the method waits.</p>
+  <p>Highest luma variance is not a substitute for finding the cut. On clips 01 and 02 the text page is the more detailed picture, and the rule matches settled. On eight clips the easy picture is more detailed, the eight frames are the first eight frames of the clip, and the shortfall is as large as the even rule’s or larger. On clips 08 and 11 the detailed frames begin on the cut, and the rule has no file, for the same reason the on-cut rule has none. Mean shortfall of the ten files it did choose is 10.13.</p>
+  <table><thead><tr><th>Rule</th><th>Files chosen</th><th>Mean shortfall</th><th>Where the eight frames landed</th></tr></thead><tbody><tr><td class="left">Even frames</td><td class="left">12 of 12</td><td class="left">10.32</td><td class="left">All on the easy picture. The 9th-worst frame of the file is inside the page.</td></tr><tr><td class="left">Settled, cut + 8</td><td class="left">12 of 12</td><td class="left">0.00</td><td class="left">Inside the page on every clip.</td></tr><tr><td class="left">On the cut</td><td class="left">9 of 12</td><td class="left">0.00</td><td class="left">Matches settled where it chooses. No file on 04, 08, and 11.</td></tr><tr><td class="left">One random draw</td><td class="left">12 of 12</td><td class="left">9.00</td><td class="left">Hits the page on clips 03 and 11 only.</td></tr><tr><td class="left">Highest variance</td><td class="left">10 of 12</td><td class="left">10.13</td><td class="left">Matches settled on 01 and 02. Samples the easy picture on eight clips.</td></tr></tbody></table>
+  <p class="status" style="text-align:left;margin-top:2px">Table 2. Comparison set only. The on-cut and variance means are over the files those rules were allowed to choose, not over the clips they skipped.</p>
+
+  <h3>6.3 More even frames, same hole</h3>
+  <p>Taking more even frames does not close the hole by inspecting the easy picture more carefully. The centers move, and a center helps only when it lands on the page. At eight frames, none of the twelve pages contains a center, and the mean shortfall is 10.32. At sixteen frames, six clips fall to shortfall 0: 02, 05, 06, 10, 11, and 12. Six do not: 01, 03, 04, 07, 08, and 09. At thirty-two frames, clips 04, 09, 10, and 12 are still short. Clip 10 is short again after being clear at sixteen.</p>
+  <table><thead><tr><th>Even centers</th><th>Clips at shortfall 0</th><th>Clips still short</th></tr></thead><tbody><tr><td class="left">1</td><td class="left">04, 09</td><td class="left">the other ten</td></tr><tr><td class="left">8</td><td class="left">none</td><td class="left">all twelve, mean 10.32</td></tr><tr><td class="left">16</td><td class="left">02, 05, 06, 10, 11, 12</td><td class="left">01, 03, 04, 07, 08, 09</td></tr><tr><td class="left">32</td><td class="left">01, 02, 03, 05, 06, 07, 08, 11</td><td class="left">04, 09, 10, 12</td></tr></tbody></table>
+  <p class="status" style="text-align:left;margin-top:2px">Table 3. Even-frame budgets on the comparison set, using CRFs already encoded. A count clears a clip when one of its centers falls inside that clip’s 20-frame page.</p>
+  <p>Clip 08’s page is frames 545–564. Four even centers include frame 562, on the page, and that file’s 9th-worst VMAF is at least 90. Eight even centers fall at 506 and 618, on either side, and the shortfall returns to 9.53. Clip 10’s page is frames 357–376. Sixteen centers include frame 365. Thirty-two centers fall at 351 and 379, and the shortfall returns to 10.31. One center can do the same by accident. The single even center of a 900-frame clip is frame 450, which sits inside the page of clips 04 and 09 and misses the other ten.</p>
+
+  <h3>6.4 Medium pages, kept out of the mean</h3>
+  <p>The six boundary clips use a screen that already has labels, cards, or toolbars, cut to the same kind of dense page for twenty frames. The direction does not reverse. Settled shortfall is zero on all six. Even-frame shortfall averages 4.07, from 0.76 on the status page to 7.62 on the sound panel. The gaps are smaller because the easy picture is no longer nearly free to compress, so the even rule cannot go as harsh. Clip 13 is the useful exception on size: settled CRF 31 produced a slightly smaller file than even CRF 32, 307,381 bytes against 310,307. x264’s size is not a smooth function of CRF. A gentler setting is usually larger here. It is not larger by a law.</p>
+  <figure>
+    <svg viewBox="0 0 680 250" role="img">
+<rect x="0" y="0" width="680" height="250" fill="#fff"/>
+<line x1="46" y1="214.0" x2="668" y2="214.0" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="217.0" text-anchor="end" font-size="10" fill="#444">0.0</text>
+<line x1="46" y1="164.5" x2="668" y2="164.5" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="167.5" text-anchor="end" font-size="10" fill="#444">2.0</text>
+<line x1="46" y1="115.0" x2="668" y2="115.0" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="118.0" text-anchor="end" font-size="10" fill="#444">4.0</text>
+<line x1="46" y1="65.5" x2="668" y2="65.5" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="68.5" text-anchor="end" font-size="10" fill="#444">6.0</text>
+<line x1="46" y1="16.0" x2="668" y2="16.0" stroke="#c8c8c8" stroke-width="1"/>
+<text x="40" y="19.0" text-anchor="end" font-size="10" fill="#444">8.0</text>
+<line x1="46" y1="16" x2="46" y2="214" stroke="#1c1c1c" stroke-width="1"/>
+<line x1="46" y1="214" x2="668" y2="214" stroke="#1c1c1c" stroke-width="1"/>
+<rect x="90.8" y="195.2" width="14.0" height="18.8" fill="#8d3b3b"/>
+<text x="97.8" y="236" text-anchor="middle" font-size="10" fill="#444">13</text>
+<rect x="194.5" y="181.8" width="14.0" height="32.2" fill="#8d3b3b"/>
+<text x="201.5" y="236" text-anchor="middle" font-size="10" fill="#444">14</text>
+<rect x="298.2" y="64.3" width="14.0" height="149.7" fill="#8d3b3b"/>
+<text x="305.2" y="236" text-anchor="middle" font-size="10" fill="#444">15</text>
+<rect x="401.8" y="25.4" width="14.0" height="188.6" fill="#8d3b3b"/>
+<text x="408.8" y="236" text-anchor="middle" font-size="10" fill="#444">16</text>
+<rect x="505.5" y="119.0" width="14.0" height="95.0" fill="#8d3b3b"/>
+<text x="512.5" y="236" text-anchor="middle" font-size="10" fill="#444">17</text>
+<rect x="609.2" y="93.5" width="14.0" height="120.5" fill="#8d3b3b"/>
+<text x="616.2" y="236" text-anchor="middle" font-size="10" fill="#444">18</text>
+</svg><div class="legend"><span class="key"><i style="background:#8d3b3b"></i>Even frames</span></div>
+    <figcaption>Figure 6. Boundary clips. Same shortfall as Figure 4, not included in the 10.32 mean. Source: clips/decisions.csv.</figcaption>
+  </figure>
+
+
+  <h3>6.5 The same clips with scene-cut left on</h3>
+  <p>The encodes above refuse a keyframe at the cut. This section repeats the choice with that refusal lifted. libx264 is still preset medium, yuv420p, one CRF for the file. The flags that forced a keyframe interval of 999 and a scene-cut threshold of 0 are omitted. The encoder's own option string on these files reads keyint=250, keyint_min=25, scenecut=40. Tables 1 to 3 stay as they were. Table 4 is this encode.</p>
+  <p>The ladder is the same kind of ladder. It starts at CRF 28, 32, 36, 40, and 44. Integer rungs are filled until the even-frame vote and the settled vote have no gap between the highest passing CRF and the next encoded CRF above it. The other eight-frame rules read those rungs. They do not add encodes. The frame lists do not change: the same even centers, the same settled frames, the same cut, the same random draw, and the same detail frames.</p>
+  <p>On clip 01 at CRF 28, the new file has I-frames at frames 0, 250, 500, 538, and 788. Frame 538 is the cut onto the page. The scene-cut-off file at CRF 28, and the scene-cut-off file at CRF 36, the rung the even rule chose, each have an I-frame only at frame 0. On the even-frame file actually chosen under the default encoder, ten of the twelve comparison clips have an I-frame on the cut into the page. Clips 05 and 07 do not. Their cuts are frames 517 and 514, which sit 17 and 14 frames after the periodic I-frame at frame 500, inside the minimum keyframe gap of 25. The scene-cut I-frame falls on the return instead, frames 537 and 534, the first frame after the page. Where the cut into the page is an I-frame, the return twenty frames later is not. It falls inside that same gap.</p>
+  <p>The twelve-clip even-frame shortfall falls from 10.32 to 3.18. A 10,000-draw bootstrap of the scene-cut-on shortfalls, seed 20261010, runs from 2.02 to 4.32. The same draw on the scene-cut-off shortfalls runs from 7.83 to 13.29. The mean reduction is 7.14, with a resampling interval from 5.31 to 9.32. The median scene-cut-on shortfall is 3.27. The shortfall gets smaller on every clip. It reaches zero only on clip 11. There the CRF stays 35, the 9th-worst is 90.5, and that frame, 369, is still inside the page. The settled shortfall stays zero on all twelve. An I-frame on the cut is not the same thing as meeting 90. Nine of the ten files that have one still miss, from 1.55 to 5.96. Clips 05 and 07, whose I-frame lands on the return, miss by 1.40 and 0.33.</p>
+  <p>The 9th-worst frame of the even-frame file is still inside the 20-frame page on all twelve clips. The 45th-worst frame is outside the page on all twelve, and the lowest of those scores is 90.32. Scene-cut has raised the page's score. It has not moved the tail off the page. The settled rule is what still holds every comparison file at 90.</p>
+  <table class="dense">
+    <thead><tr>
+      <th>Clip</th><th>Off CRF</th><th>Off shortfall</th><th>On CRF</th><th>On 9th</th><th>On shortfall</th><th>Shrink</th><th>Settled CRF</th><th>Settled shortfall</th><th>9th frame</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>01</td><td class='right'>36</td><td class='right'>8.11</td><td class='right'>38</td><td class='right'>84.7</td><td class='right'>5.28</td><td class='right'>2.82</td><td class='right'>34</td><td class='right'>0.00</td><td>page</td></tr><tr><td>02</td><td class='right'>37</td><td class='right'>8.43</td><td class='right'>37</td><td class='right'>88.5</td><td class='right'>1.55</td><td class='right'>6.88</td><td class='right'>35</td><td class='right'>0.00</td><td>page</td></tr><tr><td>03</td><td class='right'>40</td><td class='right'>20.42</td><td class='right'>38</td><td class='right'>84.0</td><td class='right'>5.96</td><td class='right'>14.46</td><td class='right'>34</td><td class='right'>0.00</td><td>page</td></tr><tr><td>04</td><td class='right'>36</td><td class='right'>8.51</td><td class='right'>37</td><td class='right'>87.3</td><td class='right'>2.72</td><td class='right'>5.79</td><td class='right'>34</td><td class='right'>0.00</td><td>page</td></tr><tr><td>05</td><td class='right'>35</td><td class='right'>7.23</td><td class='right'>35</td><td class='right'>88.6</td><td class='right'>1.40</td><td class='right'>5.83</td><td class='right'>33</td><td class='right'>0.00</td><td>page</td></tr><tr><td>06</td><td class='right'>37</td><td class='right'>7.84</td><td class='right'>37</td><td class='right'>87.9</td><td class='right'>2.08</td><td class='right'>5.76</td><td class='right'>35</td><td class='right'>0.00</td><td>page</td></tr><tr><td>07</td><td class='right'>37</td><td class='right'>8.26</td><td class='right'>36</td><td class='right'>89.7</td><td class='right'>0.33</td><td class='right'>7.93</td><td class='right'>35</td><td class='right'>0.00</td><td>page</td></tr><tr><td>08</td><td class='right'>36</td><td class='right'>9.53</td><td class='right'>37</td><td class='right'>86.0</td><td class='right'>4.03</td><td class='right'>5.51</td><td class='right'>34</td><td class='right'>0.00</td><td>page</td></tr><tr><td>09</td><td class='right'>40</td><td class='right'>20.69</td><td class='right'>38</td><td class='right'>84.1</td><td class='right'>5.88</td><td class='right'>14.81</td><td class='right'>34</td><td class='right'>0.00</td><td>page</td></tr><tr><td>10</td><td class='right'>36</td><td class='right'>10.31</td><td class='right'>37</td><td class='right'>84.9</td><td class='right'>5.11</td><td class='right'>5.20</td><td class='right'>34</td><td class='right'>0.00</td><td>page</td></tr><tr><td>11</td><td class='right'>35</td><td class='right'>3.72</td><td class='right'>35</td><td class='right'>90.5</td><td class='right'>0.00</td><td class='right'>3.72</td><td class='right'>35</td><td class='right'>0.00</td><td>page</td></tr><tr><td>12</td><td class='right'>37</td><td class='right'>10.77</td><td class='right'>37</td><td class='right'>86.2</td><td class='right'>3.83</td><td class='right'>6.94</td><td class='right'>34</td><td class='right'>0.00</td><td>page</td></tr>
+    </tbody>
+  </table>
+  <p class="status" style="text-align:left;margin-top:2px">Table 4. Comparison set with scene-cut left on. Off is the scene-cut-off encode in clips/decisions.csv. On is clips/decisions_scenecut.csv. Shrink is the off shortfall minus the on shortfall. Settled columns are the scene-cut-on file. The 9th-frame cell says whether that frame of the even-frame file sits inside the page. Source: clips/decisions.csv, clips/decisions_scenecut.csv, and clips/work/&lt;clip&gt;/scores_b/summary.csv. I-frame lists were read from the chosen even-frame files.</p>
+  <p>The settled file is 1.16 times the even-frame file on average, from 1.00 to 1.27. On clip 11 the two rules choose the same CRF, so the ratio is 1. On nine clips the scene-cut-on even-frame file is larger than the scene-cut-off file at the same or a harsher CRF. Clip 01 is one of them: CRF 38 is 248,572 bytes, and the scene-cut-off file at CRF 36 is 201,029 bytes. The comparison that belongs in the claim is the pair encoded the same way.</p>
+  <p>The six boundary clips move in the same direction. Their even-frame mean shortfall goes from 4.07 to 0.39. Four of the six reach shortfall zero. Clip 16 does not. Its cut, frame 515, is 15 frames after the I-frame at frame 500, so the scene-cut I-frame is the return at frame 535, and the shortfall is 2.06. Clip 18 does have an I-frame on the cut, and its shortfall is still 0.31. Settled shortfall is zero on five of the six. On clip 13 the settled file misses by 0.37 while the even-frame file clears. Those six stay out of the twelve-clip mean.</p>
+  <table>
+    <thead><tr><th>Clip</th><th>Off shortfall</th><th>On shortfall</th><th>Settled shortfall</th></tr></thead>
+    <tbody><tr><td>13</td><td class='right'>0.76</td><td class='right'>0.00</td><td class='right'>0.37</td></tr><tr><td>14</td><td class='right'>1.30</td><td class='right'>0.00</td><td class='right'>0.00</td></tr><tr><td>15</td><td class='right'>6.05</td><td class='right'>0.00</td><td class='right'>0.00</td></tr><tr><td>16</td><td class='right'>7.62</td><td class='right'>2.06</td><td class='right'>0.00</td></tr><tr><td>17</td><td class='right'>3.84</td><td class='right'>0.00</td><td class='right'>0.00</td></tr><tr><td>18</td><td class='right'>4.87</td><td class='right'>0.31</td><td class='right'>0.00</td></tr></tbody>
+  </table>
+  <p class="status" style="text-align:left;margin-top:2px">Table 5. Boundary clips, scene-cut off against scene-cut on. Not in the twelve-clip mean.</p>
+
+  <h2>7. Discussion</h2>
+  <p>The result is a disagreement between the vote and the file. The even vote looks only at the easy picture, so it accepts a CRF whose damaged frames are exactly the page. The settled vote looks only at the page, so it refuses that CRF. The 9th-worst frame of each spread file is inside that page, and it is never one of the eight sampled frames. Judged by the 9th-worst of all 900 frames, among encoded rungs, the settled CRF is the one that list would have kept. Judged by the 45th-worst frame, the spread file would have been reported as meeting VMAF 90. That report is a VMAF percentile. It is not a reading result.</p>
+  <p>The cost is real and should be printed beside the score. Choosing that gentler CRF for the whole file costs, on this set, a little over a quarter more bytes and 5.7 CRF units. The study accepts or rejects one CRF for all 900 frames. It does not move bits onto the page. It is not a small constant, and it is not a doubling. Clips 03 and 09, where the even file falls to about 69, pay the most in both score and bytes.</p>
+  <p>The other eight-frame rules do not rescue the even sample. A random draw misses unless it is lucky. Detail misses whenever the easy picture is the busier of the two, which is common once the easy picture is a colored desktop rather than a blank slide. The cut frame itself is the wrong place to read: VMAF can score the jump at zero while the settled page a few frames later is a coherent, merely soft, picture. The study waits eight frames. Section 6.2 shows that a shorter or longer wait, still off the jump, holds the same files. Eight is the rule that was locked.</p>
+  <p>None of this says that a short text page is typical of screen video. The page is short on purpose. If it stayed up for several seconds, the even frames would hit it and there would be little to measure. Figure 2 is that admission in advance. The study is a stress test for a check, built so the check can be wrong. Section 6.5 leaves scene-cut on. The even-frame mean on these twelve clips falls from 10.32 to 3.18, the 9th-worst frame stays inside the page, and eleven of the twelve files still miss 90.</p>
+
+  <h2>8. Limits</h2>
+  <p>These twelve clips are a development set. The same pictures repeat. The starts were drawn before the files existed, and they were not moved to dodge the even frames, but a second set, scored only after the pipeline was frozen, is what a confirmation would be. The bootstrap resamples this set. It does not stand in for that second set.</p>
+  <p>The pictures are stills joined by a hard cut. They are not a camera, not a scrolling page, and not a person moving a window. On every comparison clip, 99.8% of easy-frame pairs sit at or below the cut threshold of 2, and the planted cuts sit well above it. The threshold was not swept. A nearby value would still have found these cuts. That is not a test on flicker, fades, or motion. A recording that flickers, fades, or cuts every few seconds is a different question. The first settled picture would then not automatically be the page that matters.</p>
+  <p>Scene-cut detection was turned off in the first encode, and the GOP was longer than the clip. Section 6.5 runs the same clips again without those flags. The files use keyint 250, keyint_min 25, and scenecut 40, which is x264's own default string. Ten of the twelve even-frame files have a keyframe on the cut into the page. The mean falls from 10.32 to 3.18. It remains above zero on 11 clips, and the 9th-worst frame remains inside the page on all twelve. One preset and one rate-control mode were used. A different preset could move the keyframe or the score. The result is no longer only the result for an encoder that was refused a reset at the cut.</p>
+  <p>One CRF covers the whole file. Giving the page its own strength, or switching codec, preset, or rate control, would be a different experiment and a different claim. VMAF is not a reading test, and no text-reading check was run. A soft page can score in the low 80s and still be the wrong thing to ship, or, on some type, still be readable. No one was asked. MS-SSIM and PSNR were not run, so the result is a VMAF result. Target 80 does not reverse the comparison on this set, but four spread files miss 80 as well as 90, so the story is not an artifact of the number 90 alone.</p>
+  <p>Photographic pictures were not used. An earlier check on fur, gravel, and leaves, at a smaller frame size, had both rules pick the same gentle CRF. Those rows are not in this table. They are why this set stays on flat screen graphics and readable text.</p>
+
+  <h2>9. Conclusion</h2>
+  <p>Eight even frames and a 5th-percentile score can agree, and both can be looking at the easy picture. On twelve scripted screen clips, the file those eight frames chose has its 9th-worst frame inside a twenty-frame page every time, 10.32 points below VMAF 90 on average, while the 45th-worst frame stays outside the page and above 90. Eight frames taken a quarter of a second after the cut hold 90 on every one of those clips. The file is about 27% larger. The result is a property of a short page in a long easy stretch, with one libx264 CRF for the file, scene-cut off, and a GOP longer than the clip. On these twelve clips, among the rungs the ladder encoded, the settled CRF is also the highest CRF whose 9th-worst of all 900 frames is still at least 90. Adding even centers does not repair the miss unless a center moves onto the page. With scene-cut left on, the even-frame mean on these twelve clips is 3.18 rather than 10.32. The shortfall reaches zero on clip 11 only. The 9th-worst frame stays inside the page on all twelve. It is a VMAF result. It is not yet a property of a held-out set, of another preset, of another metric, or of a viewer.</p>
+
+  <h2>References</h2>
+  <div class="refs">
+    <p>[1] Z. Li, A. Aaron, I. Katsavounidis, A. Moorthy, and M. Manohara, “Toward a practical perceptual video quality metric,” Netflix Technology Blog, 2016.</p>
+    <p>[2] Netflix, libvmaf, percentile pooling of the per-frame score. https://github.com/Netflix/vmaf</p>
+    <p>[3] VideoLAN, x264. Constant rate factor and scene-cut detection as exposed by FFmpeg. https://trac.ffmpeg.org/wiki/Encode/H.264</p>
+    <p>[4] ITU-T Recommendation P.910, Subjective video quality assessment methods for multimedia applications.</p>
+    <p>[5] ITU-R Recommendation BT.500, Methodologies for the subjective assessment of the quality of television images.</p>
+    <p>[6] A. Hanjalic, “Shot-boundary detection: Unraveled and resolved?” IEEE Transactions on Circuits and Systems for Video Technology, vol. 12, no. 2, pp. 90–105, 2002.</p>
+    <p>[7] Z. Wang, A. C. Bovik, H. R. Sheikh, and E. P. Simoncelli, “Image quality assessment: From error visibility to structural similarity,” IEEE Transactions on Image Processing, vol. 13, no. 4, pp. 600–612, 2004.</p>
+  </div>
+</body>
+</html>
