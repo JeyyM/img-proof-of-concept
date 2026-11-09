@@ -1,15 +1,18 @@
-"""Time the brightness sum on the official clip, then one full VMAF pass.
+"""Time the brightness sum on clip 01, then one full VMAF pass.
 
-The sum is timed after the frames are in memory. Reading the clip is outside
-that clock. The VMAF figure is the whole score command, including reading
-both videos. It is one pass of the text-chosen file, CRF 30.
+Clip 01 is the agenda slide and the article, built from images/simple and
+images/dense. The sum is timed after the frames are in memory. Reading the
+clip is outside that clock. The VMAF figure is the whole score command,
+including reading both videos. It is one pass of the settled file, CRF 31.
 """
 
 import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CLIP = Path(__file__).resolve().parent / "clip"
+CLIPS = ROOT / "clips"
+REFERENCE = CLIPS / "01.mkv"
+SETTLED = CLIPS / "work" / "01" / "encodes" / "crf31.mp4"
 FFMPEG = Path(
     r"C:\Users\asus\AppData\Local\Programs\Python\Python313\Lib\site-packages"
     r"\imageio_ffmpeg\binaries\ffmpeg-win-x86_64-v7.1.exe"
@@ -72,7 +75,7 @@ def time_kernel():
             "-loglevel",
             "error",
             "-i",
-            str(CLIP / "reference.mkv"),
+            str(REFERENCE),
             "-f",
             "rawvideo",
             "-pix_fmt",
@@ -96,7 +99,7 @@ def time_kernel():
 
 
 def time_vmaf():
-    log_dir = CLIP / "timing"
+    log_dir = CLIPS / "work" / "01" / "timing"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / "vmaf_pass.json"
     if log_path.exists():
@@ -109,9 +112,9 @@ def time_vmaf():
             "-loglevel",
             "error",
             "-i",
-            str(CLIP / "encodes" / "crf30.mp4"),
+            str(SETTLED),
             "-i",
-            str(CLIP / "reference.mkv"),
+            str(REFERENCE),
             "-lavfi",
             "[0:v]format=yuv420p,setpts=PTS-STARTPTS[dist];"
             "[1:v]format=yuv420p,setpts=PTS-STARTPTS[ref];"
@@ -160,7 +163,7 @@ def main():
     by_name = {row["method"]: float(row["median_s"]) for row in rows}
     plain = by_name["plain_c"]
     compiler = by_name["autovectorized_c"]
-    out = CLIP / "timing.csv"
+    out = CLIPS / "timing.csv"
     with out.open("w", encoding="utf-8", newline="") as handle:
         handle.write("method,median_s,runs_s,speedup_vs_plain,speedup_vs_compiler\n")
         for row in rows:
@@ -173,11 +176,11 @@ def main():
             handle.write(
                 f"{name},{row['median_s']},{row['runs_s']},{versus_plain},{versus_compiler}\n"
             )
-    note = CLIP / "timing.txt"
+    note = CLIPS / "timing.txt"
     note.write_text(
         "\n".join(
             [
-                "Clip: course/clip/reference.mkv, 1920x1080, 900 frames, 899 pairs.",
+                "Clip: clips/01.mkv, agenda slide and article, 1920x1080, 900 frames, 899 pairs.",
                 "plain_c: the detect.c loop, compiled -O2 with the vectorizer off.",
                 "autovectorized_c: the same loop, compiled -O2 -mavx2 with the vectorizer on. GCC widened the bytes. It did not emit the SAD instruction.",
                 "avx2_asm: src/sad_avx2.s, 32 bytes per vpsadbw. The clock covers the sum only, after frames are in memory.",
@@ -185,9 +188,9 @@ def main():
                 f"Speedup, compiler against plain: {plain / compiler:.2f}x.",
                 f"Speedup, AVX2 against compiler: {compiler / by_name['avx2_asm']:.2f}x.",
                 "Encoding time is not in this table.",
-                "vmaf_one_pass: one libvmaf score of encodes/crf30.mp4, 8 threads, including reading both videos. It is not a speedup.",
+                "vmaf_one_pass: one libvmaf score of clips/work/01/encodes/crf31.mp4, 8 threads, including reading both videos. It is not a speedup.",
                 f"Kernel check: {' '.join(header)}.",
-                "Cut lists, one per kernel: course/clip/cuts.txt.",
+                "Cut lists, one per kernel: clips/cuts.txt.",
                 "",
             ]
         ),

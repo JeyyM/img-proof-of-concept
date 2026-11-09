@@ -2,7 +2,7 @@
 
 Run from the repository root:
 
-    python -m streamlit run ui/app.py
+    python -m streamlit run aside/ui/app.py
 """
 
 import csv
@@ -16,7 +16,7 @@ from pathlib import Path
 import streamlit as st
 from PIL import Image
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "clips"))
 
 import build_clips  # noqa: E402
@@ -266,7 +266,7 @@ def score_folder(folder, reference):
 
 
 def course_line():
-    path = ROOT / "course" / "clip" / "timing.csv"
+    path = ROOT / "clips" / "timing.csv"
     if not path.exists():
         return ""
     medians = {}
@@ -279,7 +279,7 @@ def course_line():
     if not (plain and compiler and avx):
         return ""
     return (
-        f"Course kernel, one clip. Plain {plain:.2f} s. "
+        f"Clip 01. Plain {plain:.2f} s. "
         f"Compiler {compiler:.2f} s ({plain / compiler:.2f}×). "
         f"AVX2 {avx:.2f} s ({compiler / avx:.2f}×). Mismatches 0."
     )

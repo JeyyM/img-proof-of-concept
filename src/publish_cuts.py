@@ -1,4 +1,4 @@
-"""Decode the course clip once and write the three cut lists."""
+"""Decode clip 01 once and write the three cut lists."""
 
 import subprocess
 import threading
@@ -13,7 +13,7 @@ FFMPEG = Path(
 GCC = Path(r"C:\winlibs\mingw64\bin\gcc.exe")
 BUILD = COURSE / "build"
 EXE = BUILD / "list_cuts.exe"
-CLIP = COURSE / "clip" / "reference.mkv"
+CLIP = ROOT / "clips" / "01.mkv"
 
 
 def compile_lister():
@@ -86,9 +86,9 @@ def main():
     text = b"".join(out).decode("utf-8")
     if det.returncode != 0:
         raise SystemExit(b"".join(err).decode("utf-8", "replace") or f"list_cuts exited {det.returncode}")
-    dest = COURSE / "clip" / "cuts.txt"
+    dest = ROOT / "clips" / "cuts.txt"
     dest.write_text(
-        "Course clip course/clip/reference.mkv. A cut is the first frame of a run whose mean absolute luma difference exceeds 2.\n"
+        "Clip clips/01.mkv, the agenda slide and the article. A cut is the first frame of a run whose mean absolute luma difference exceeds 2.\n"
         "The three kernels were run on the same decoded frames. The lists are the frames each kernel marked.\n"
         + text,
         encoding="utf-8",

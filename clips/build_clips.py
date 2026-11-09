@@ -15,6 +15,7 @@ from PIL import Image, ImageChops, ImageStat
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = Path(__file__).resolve().parent
+IMAGES = ROOT / "images"
 FFMPEG = Path(
     r"C:\Users\asus\AppData\Local\Programs\Python\Python313\Lib\site-packages"
     r"\imageio_ffmpeg\binaries\ffmpeg-win-x86_64-v7.1.exe"
@@ -27,28 +28,28 @@ HOLD = 20
 FRAME_BYTES = WIDTH * HEIGHT * 3
 
 SIMPLE = [
-    ROOT / "simple" / "agenda slide.png",
-    ROOT / "simple" / "empty dashboard.png",
-    ROOT / "simple" / "empty-editor.png",
-    ROOT / "simple" / "section divider.png",
-    ROOT / "simple" / "grid-desktop.png",
-    ROOT / "simple" / "editor-desktop.png",
+    IMAGES / "simple" / "agenda slide.png",
+    IMAGES / "simple" / "empty dashboard.png",
+    IMAGES / "simple" / "empty-editor.png",
+    IMAGES / "simple" / "section divider.png",
+    IMAGES / "simple" / "grid-desktop.png",
+    IMAGES / "simple" / "editor-desktop.png",
 ]
 MEDIUM = [
-    ROOT / "medium" / "analytics.png",
-    ROOT / "medium" / "blank-writer.png",
-    ROOT / "medium" / "board.png",
-    ROOT / "medium" / "control-panel.png",
-    ROOT / "medium" / "file-manager.png",
-    ROOT / "medium" / "appearance.png",
+    IMAGES / "medium" / "analytics.png",
+    IMAGES / "medium" / "blank-writer.png",
+    IMAGES / "medium" / "board.png",
+    IMAGES / "medium" / "control-panel.png",
+    IMAGES / "medium" / "file-manager.png",
+    IMAGES / "medium" / "appearance.png",
 ]
 DENSE = [
-    ROOT / "dense" / "article.png",
-    ROOT / "dense" / "code-editor.png",
-    ROOT / "dense" / "rfc-body.png",
-    ROOT / "dense" / "spec-columns.png",
-    ROOT / "dense" / "spreadsheet.png",
-    ROOT / "dense" / "terminal-log.png",
+    IMAGES / "dense" / "article.png",
+    IMAGES / "dense" / "code-editor.png",
+    IMAGES / "dense" / "rfc-body.png",
+    IMAGES / "dense" / "spec-columns.png",
+    IMAGES / "dense" / "spreadsheet.png",
+    IMAGES / "dense" / "terminal-log.png",
 ]
 
 
@@ -157,6 +158,13 @@ def luma_mad(left, right):
     return ImageStat.Stat(ImageChops.difference(a, b)).mean[0]
 
 
+def write_log(log_path, fields, plan):
+    with log_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(plan)
+
+
 def main():
     OUT.mkdir(exist_ok=True)
     drawn = starts()
@@ -180,15 +188,9 @@ def main():
         with log_path.open(encoding="utf-8", newline="") as handle:
             for old in csv.DictReader(handle):
                 prior[old["clip"]] = old
-    with log_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(plan)
-    print("starts written", [row["start"] for row in plan])
-
-    for row, (group, easy, dense) in zip(plan, pairs()):
+    paired = list(zip(plan, pairs()))
+    for row, (group, easy, dense) in paired:
         if easy is None or dense is None:
-            print("skip", row["clip"])
             continue
         dest = OUT / f"{row['clip']}.mkv"
         old = prior.get(row["clip"])
@@ -196,8 +198,17 @@ def main():
             for key in fields:
                 if old.get(key):
                     row[key] = old[key]
+    write_log(log_path, fields, plan)
+    print("starts written", [row["start"] for row in plan])
+
+    for row, (group, easy, dense) in paired:
+        if row["status"] == "built":
             print("keep", row["clip"])
             continue
+        if easy is None or dense is None:
+            print("skip", row["clip"])
+            continue
+        dest = OUT / f"{row['clip']}.mkv"
         print("encode", row["clip"], "start", row["start"])
         encode(easy, dense, row["start"], dest)
         count = frame_count(dest)
@@ -213,10 +224,7 @@ def main():
         row["cut_back"] = f"{luma_mad(dense_frame, after):.2f}"
         row["status"] = "built" if count == TOTAL and row["easy_match"] and row["dense_match"] else "check failed"
         print(row["clip"], row["status"], row["frames"], row["bytes"], row["cut_on"], row["cut_back"])
-        with log_path.open("w", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=fields)
-            writer.writeheader()
-            writer.writerows(plan)
+        write_log(log_path, fields, plan)
 
 
 if __name__ == "__main__":
