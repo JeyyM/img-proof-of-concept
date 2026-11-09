@@ -1,9 +1,8 @@
-"""Practice clips: 1920x1080, 30 fps, 900 frames, 20-frame dense hold.
+"""Build the 18 lossless practice clips.
 
-Starts are the first 18 draws of seed 20261010, uniform on frames 180 through 700.
-The file is written down before any clip is encoded. The encoder is lossless RGB
-x264 with one group of pictures for the whole clip, so a still screen is stored
-once instead of nine hundred times.
+Each clip holds one easy screen for 30 seconds. A dense page covers it
+for 20 frames, about two-thirds of a second. The page start is drawn
+once from a fixed seed. A clip that is already built is left alone.
 """
 
 import csv
@@ -11,7 +10,7 @@ import random
 import subprocess
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageStat
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = Path(__file__).resolve().parent
@@ -20,6 +19,7 @@ FFMPEG = Path(
     r"C:\Users\asus\AppData\Local\Programs\Python\Python313\Lib\site-packages"
     r"\imageio_ffmpeg\binaries\ffmpeg-win-x86_64-v7.1.exe"
 )
+
 SEED = 20261010
 WIDTH, HEIGHT = 1920, 1080
 FPS = 30
@@ -27,6 +27,19 @@ TOTAL = 900
 HOLD = 20
 FRAME_BYTES = WIDTH * HEIGHT * 3
 
+LOG_FIELDS = [
+    "clip",
+    "group",
+    "easy",
+    "dense",
+    "start",
+    "hold",
+    "frames",
+    "bytes",
+    "status",
+]
+
+# Plain screens. Each one is used twice in the comparison set.
 SIMPLE = [
     IMAGES / "simple" / "agenda slide.png",
     IMAGES / "simple" / "empty dashboard.png",
@@ -35,6 +48,8 @@ SIMPLE = [
     IMAGES / "simple" / "grid-desktop.png",
     IMAGES / "simple" / "editor-desktop.png",
 ]
+
+# Busier screens. These six stay out of the comparison mean.
 MEDIUM = [
     IMAGES / "medium" / "analytics.png",
     IMAGES / "medium" / "blank-writer.png",
@@ -43,6 +58,8 @@ MEDIUM = [
     IMAGES / "medium" / "file-manager.png",
     IMAGES / "medium" / "appearance.png",
 ]
+
+# The short page someone has to read.
 DENSE = [
     IMAGES / "dense" / "article.png",
     IMAGES / "dense" / "code-editor.png",
@@ -54,26 +71,35 @@ DENSE = [
 
 
 def pairs():
-    rows = []
+    """Clips 01–06 match in order. 07–12 repeat the screens with the next page. 13–18 are the boundary."""
+    matched = []
+    shifted = []
+    boundary = []
     for index in range(6):
-        rows.append(("comparison", SIMPLE[index], DENSE[index]))
-    for index in range(6):
-        rows.append(("comparison", SIMPLE[index], DENSE[(index + 1) % 6]))
-    for index in range(6):
-        rows.append(("boundary", MEDIUM[index], DENSE[(index + 2) % 6]))
-    return rows
+        matched.append(("comparison", SIMPLE[index], DENSE[index]))
+        next_page = DENSE[(index + 1) % 6]
+        shifted.append(("comparison", SIMPLE[index], next_page))
+        boundary_page = DENSE[(index + 2) % 6]
+        boundary.append(("boundary", MEDIUM[index], boundary_page))
+    return matched + shifted + boundary
 
 
 def starts():
+    """Eighteen page starts, frames 180 through 700. The seed makes the draw repeatable."""
     rng = random.Random(SEED)
     return [rng.randint(180, 700) for _ in range(18)]
 
 
 def run(args):
-    subprocess.run([str(FFMPEG), "-y", "-hide_banner", "-loglevel", "error", *args], check=True)
+    """Start FFmpeg. Stop the script if FFmpeg fails."""
+    subprocess.run(
+        [str(FFMPEG), "-y", "-hide_banner", "-loglevel", "error", *args],
+        check=True,
+    )
 
 
 def picture_filter(path):
+    """FFmpeg filter that makes one still a 1920x1080 RGB frame."""
     with Image.open(path) as image:
         size = image.size
     if size == (WIDTH, HEIGHT):
@@ -82,40 +108,46 @@ def picture_filter(path):
 
 
 def encode(easy, dense, start, dest):
-    easy_chain = picture_filter(easy)
-    dense_chain = picture_filter(dense)
+    """Write one lossless clip. The dense page covers the easy picture for 20 frames."""
+    last = start + HOLD - 1
     graph = (
-        f"[0:v]{easy_chain}[e];"
-        f"[1:v]{dense_chain}[d];"
-        f"[e][d]overlay=format=rgb:enable='between(n,{start},{start + HOLD - 1})',format=rgb24"
+        f"[0:v]{picture_filter(easy)}[easy];"
+        f"[1:v]{picture_filter(dense)}[page];"
+        f"[easy][page]overlay=format=rgb:enable='between(n,{start},{last})',format=rgb24"
     )
-    run(
-        [
-            "-loop", "1", "-framerate", str(FPS), "-i", str(easy),
-            "-loop", "1", "-framerate", str(FPS), "-i", str(dense),
-            "-filter_complex", graph,
-            "-frames:v", str(TOTAL),
-            "-fps_mode", "cfr",
-            "-an",
-            "-c:v", "libx264rgb",
-            "-qp", "0",
-            "-preset", "medium",
-            "-pix_fmt", "rgb24",
-            "-x264-params", "keyint=900:min-keyint=900:scenecut=0",
-            str(dest),
-        ]
-    )
+    inputs = [
+        "-loop", "1", "-framerate", str(FPS), "-i", str(easy),
+        "-loop", "1", "-framerate", str(FPS), "-i", str(dense),
+    ]
+    length = [
+        "-filter_complex", graph,
+        "-frames:v", str(TOTAL),
+        "-fps_mode", "cfr",
+        "-an",
+    ]
+    # QP 0 is lossless. One group of pictures, and no keyframe inserted at the page.
+    lossless = [
+        "-c:v", "libx264rgb",
+        "-qp", "0",
+        "-preset", "medium",
+        "-pix_fmt", "rgb24",
+        "-x264-params", "keyint=900:min-keyint=900:scenecut=0",
+    ]
+    run([*inputs, *length, *lossless, str(dest)])
 
 
 def raw_still(path):
-    vf = picture_filter(path)
+    """Pixels of an original picture, sized the same way the clip stored it."""
     proc = subprocess.run(
         [
             str(FFMPEG), "-hide_banner", "-loglevel", "error",
-            "-i", str(path), "-vf", vf, "-frames:v", "1",
+            "-i", str(path),
+            "-vf", picture_filter(path),
+            "-frames:v", "1",
             "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
         ],
-        check=True, capture_output=True,
+        check=True,
+        capture_output=True,
     )
     if len(proc.stdout) != FRAME_BYTES:
         raise SystemExit(f"{path.name} scaled to {len(proc.stdout)} bytes")
@@ -123,6 +155,7 @@ def raw_still(path):
 
 
 def raw_frame(clip, number):
+    """Pixels of one frame from a finished clip."""
     proc = subprocess.run(
         [
             str(FFMPEG), "-hide_banner", "-loglevel", "error",
@@ -131,7 +164,8 @@ def raw_frame(clip, number):
             "-vframes", "1",
             "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
         ],
-        check=True, capture_output=True,
+        check=True,
+        capture_output=True,
     )
     if len(proc.stdout) != FRAME_BYTES:
         raise SystemExit(f"{clip.name} frame {number} is {len(proc.stdout)} bytes")
@@ -139,9 +173,11 @@ def raw_frame(clip, number):
 
 
 def frame_count(clip):
+    """How many frames FFmpeg finds in the clip."""
     proc = subprocess.run(
         [str(FFMPEG), "-i", str(clip), "-map", "0:v:0", "-c", "copy", "-f", "null", "-"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     count = None
     for line in proc.stderr.splitlines():
@@ -152,24 +188,26 @@ def frame_count(clip):
     return count
 
 
-def luma_mad(left, right):
-    a = Image.frombytes("RGB", (WIDTH, HEIGHT), left).convert("L")
-    b = Image.frombytes("RGB", (WIDTH, HEIGHT), right).convert("L")
-    return ImageStat.Stat(ImageChops.difference(a, b)).mean[0]
-
-
-def write_log(log_path, fields, plan):
+def write_log(log_path, plan):
+    """Replace clips/log.csv with the current plan."""
     with log_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
+        writer = csv.DictWriter(handle, fieldnames=LOG_FIELDS, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(plan)
 
 
-def main():
-    OUT.mkdir(exist_ok=True)
-    drawn = starts()
+def read_log(log_path):
+    if not log_path.exists():
+        return {}
+    with log_path.open(encoding="utf-8", newline="") as handle:
+        return {row["clip"]: row for row in csv.DictReader(handle)}
+
+
+def plan_clips(drawn):
+    """One pending row per picture pair, numbered 01 through 18."""
     plan = []
     for number, (group, easy, dense) in enumerate(pairs(), start=1):
+        missing = easy is None or dense is None
         plan.append(
             {
                 "clip": f"{number:02d}",
@@ -178,53 +216,61 @@ def main():
                 "dense": "" if dense is None else str(dense.relative_to(ROOT)),
                 "start": drawn[number - 1],
                 "hold": HOLD,
-                "status": "waiting on still" if easy is None or dense is None else "pending",
+                "status": "waiting on still" if missing else "pending",
             }
         )
-    log_path = OUT / "log.csv"
-    fields = ["clip", "group", "easy", "dense", "start", "hold", "frames", "bytes", "easy_match", "dense_match", "cut_on", "cut_back", "status"]
-    prior = {}
-    if log_path.exists():
-        with log_path.open(encoding="utf-8", newline="") as handle:
-            for old in csv.DictReader(handle):
-                prior[old["clip"]] = old
-    paired = list(zip(plan, pairs()))
-    for row, (group, easy, dense) in paired:
+    return plan
+
+
+def restore_finished(plan, previous):
+    """A clip already on disk, and marked built, keeps its recorded row."""
+    for row, (group, easy, dense) in zip(plan, pairs()):
         if easy is None or dense is None:
             continue
-        dest = OUT / f"{row['clip']}.mkv"
-        old = prior.get(row["clip"])
-        if dest.exists() and old and old.get("status") == "built":
-            for key in fields:
+        video = OUT / f"{row['clip']}.mkv"
+        old = previous.get(row["clip"])
+        if video.exists() and old and old.get("status") == "built":
+            for key in LOG_FIELDS:
                 if old.get(key):
                     row[key] = old[key]
-    write_log(log_path, fields, plan)
+
+
+def check_clip(easy, dense, video, start):
+    """Confirm 900 frames, and that frame 0 and the page frame match the stills."""
+    total = frame_count(video)
+    opening = raw_frame(video, 0)
+    page = raw_frame(video, start)
+    passed = total == TOTAL and opening == raw_still(easy) and page == raw_still(dense)
+    return {
+        "frames": total,
+        "bytes": video.stat().st_size,
+        "status": "built" if passed else "check failed",
+    }
+
+
+def main():
+    OUT.mkdir(exist_ok=True)
+    log_path = OUT / "log.csv"
+
+    plan = plan_clips(starts())
+    restore_finished(plan, read_log(log_path))
+    write_log(log_path, plan)
     print("starts written", [row["start"] for row in plan])
 
-    for row, (group, easy, dense) in paired:
+    for row, (group, easy, dense) in zip(plan, pairs()):
         if row["status"] == "built":
             print("keep", row["clip"])
             continue
         if easy is None or dense is None:
             print("skip", row["clip"])
             continue
-        dest = OUT / f"{row['clip']}.mkv"
+
+        video = OUT / f"{row['clip']}.mkv"
         print("encode", row["clip"], "start", row["start"])
-        encode(easy, dense, row["start"], dest)
-        count = frame_count(dest)
-        easy_frame = raw_frame(dest, 0)
-        dense_frame = raw_frame(dest, row["start"])
-        before = raw_frame(dest, row["start"] - 1)
-        after = raw_frame(dest, row["start"] + HOLD)
-        row["frames"] = count
-        row["bytes"] = dest.stat().st_size
-        row["easy_match"] = int(easy_frame == raw_still(easy))
-        row["dense_match"] = int(dense_frame == raw_still(dense))
-        row["cut_on"] = f"{luma_mad(before, dense_frame):.2f}"
-        row["cut_back"] = f"{luma_mad(dense_frame, after):.2f}"
-        row["status"] = "built" if count == TOTAL and row["easy_match"] and row["dense_match"] else "check failed"
-        print(row["clip"], row["status"], row["frames"], row["bytes"], row["cut_on"], row["cut_back"])
-        write_log(log_path, fields, plan)
+        encode(easy, dense, row["start"], video)
+        row.update(check_clip(easy, dense, video, row["start"]))
+        print(row["clip"], row["status"], row["frames"], row["bytes"])
+        write_log(log_path, plan)
 
 
 if __name__ == "__main__":

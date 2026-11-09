@@ -11,6 +11,7 @@ FFMPEG = Path(
     r"\imageio_ffmpeg\binaries\ffmpeg-win-x86_64-v7.1.exe"
 )
 GCC = Path(r"C:\winlibs\mingw64\bin\gcc.exe")
+NASM = Path(r"C:\winlibs\mingw64\bin\nasm.exe")
 BUILD = COURSE / "build"
 EXE = BUILD / "list_cuts.exe"
 CLIP = ROOT / "clips" / "01.mkv"
@@ -21,16 +22,24 @@ def compile_lister():
     subprocess.run(
         [
             str(GCC), "-O2", "-fno-tree-vectorize", "-fno-tree-slp-vectorize",
-            "-DSAD_NAME=sad_plain", "-c", "-o", str(BUILD / "sad_plain.o"),
-            str(ROOT / "src" / "sad_scalar.c"),
+            "-DBRIGHTNESS_FUNCTION=brightness_ordinary_c", "-c", "-o", str(BUILD / "brightness_ordinary_c.o"),
+            str(ROOT / "src" / "brightness_c.c"),
         ],
         check=True,
     )
     subprocess.run(
         [
             str(GCC), "-O2", "-mavx2", "-ftree-vectorize",
-            "-DSAD_NAME=sad_autovec", "-c", "-o", str(BUILD / "sad_autovec.o"),
-            str(ROOT / "src" / "sad_scalar.c"),
+            "-DBRIGHTNESS_FUNCTION=brightness_compiler_c", "-c", "-o", str(BUILD / "brightness_compiler_c.o"),
+            str(ROOT / "src" / "brightness_c.c"),
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            str(NASM), "-f", "win64",
+            "-o", str(BUILD / "brightness_avx2.o"),
+            str(ROOT / "src" / "brightness_avx2.asm"),
         ],
         check=True,
     )
@@ -38,9 +47,9 @@ def compile_lister():
         [
             str(GCC), "-O2", "-mavx2", "-o", str(EXE),
             str(COURSE / "list_cuts.c"),
-            str(BUILD / "sad_plain.o"),
-            str(BUILD / "sad_autovec.o"),
-            str(ROOT / "src" / "sad_avx2.s"),
+            str(BUILD / "brightness_ordinary_c.o"),
+            str(BUILD / "brightness_compiler_c.o"),
+            str(BUILD / "brightness_avx2.o"),
         ],
         check=True,
     )

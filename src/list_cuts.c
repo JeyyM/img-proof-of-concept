@@ -1,95 +1,155 @@
-/* List the cut frames from the three course kernels. Not timed. */
+/* Will read grayscale frames to detect when the cut happens */
 
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <io.h>
 #include <fcntl.h>
 
-uint64_t sad_plain(const uint8_t *a, const uint8_t *b, size_t n);
-uint64_t sad_autovec(const uint8_t *a, const uint8_t *b, size_t n);
-uint64_t sad_avx2_asm(const uint8_t *a, const uint8_t *b, size_t n);
+uint64_t brightness_ordinary_c(const uint8_t *first, const uint8_t *second, size_t pixel_count);
+uint64_t brightness_compiler_c(const uint8_t *first, const uint8_t *second, size_t pixel_count);
+uint64_t brightness_avx2(const uint8_t *first, const uint8_t *second, size_t pixel_count);
 
 #define MAX_CUTS 32
 
-static void note(int *cuts, int *count, int *in_run, int frame, int above) {
-    if (above && !*in_run) {
-        if (*count < MAX_CUTS) {
-            cuts[(*count)++] = frame;
-        }
-        *in_run = 1;
-    } else if (!above) {
-        *in_run = 0;
+/* Receive absolute sum from frames to mark the frame of the cut */
+static void mark_cut(int *cuts, int *count, int *in_a_run, int frame, int above) {
+    int already_in_a_run = *in_a_run;
+
+    /* Back below the line. The next rise can start a new run. */
+    if (!above) {
+        *in_a_run = 0;
+        return;
     }
+
+    *in_a_run = 1;
+
+    /* This pair is above the line, but the previous one was too. */
+    if (already_in_a_run) {
+        return;
+    }
+    if (*count >= MAX_CUTS) {
+        return;
+    }
+
+    cuts[*count] = frame;
+    *count += 1;
 }
 
-static void show(const char *name, const int *cuts, int count) {
-    int i;
+/* Prints the frames found by a method such as
+   "brightness_ordinary_c 538 558"
+   "brightness_compiler_c 538 558"
+   "brightness_avx2 538 558"
+*/
+static void print_cuts(const char *name, const int *cuts, int count) {
+    int index;
+
     printf("%s", name);
-    for (i = 0; i < count; i++) {
-        printf(" %d", cuts[i]);
+    for (index = 0; index < count; index++) {
+        printf(" %d", cuts[index]);
     }
     printf("\n");
 }
 
-int main(int argc, char **argv) {
-    int width;
-    int height;
-    size_t npix;
-    uint64_t limit;
-    uint8_t *prev;
-    uint8_t *curr;
-    int frame = 0;
-    int mismatches = 0;
-    int plain_cuts[MAX_CUTS], auto_cuts[MAX_CUTS], avx_cuts[MAX_CUTS];
-    int plain_n = 0, auto_n = 0, avx_n = 0;
-    int plain_run = 0, auto_run = 0, avx_run = 0;
+int main(int argument_count, char **arguments) {
+    int width;           // frame width, from the first argument
+    int height;          // frame height, from the second argument
+    size_t pixel_count;  // width times height, one byte per pixel
 
-    if (argc != 3) {
+    uint64_t cut_line;  // minimum needed to count as a cut which is 2
+    uint8_t *previous_frame; // the frame already read
+    uint8_t *current_frame;  // the frame just read
+    int frame = 0;               // index of the frame just read, also the number of pairs
+    
+    // for mismatch detection of the 3 methods
+    int mismatches = 0;          // pairs where the three sums disagree
+
+    // for storing the frames marked by the 3 methods
+    int ordinary_cuts[MAX_CUTS];
+    int compiler_cuts[MAX_CUTS];
+    int assembly_cuts[MAX_CUTS];
+
+    // for counting the number of cuts stored by each method which should be 2 in total
+    int ordinary_count = 0;
+    int compiler_count = 0;
+    int assembly_count = 0;
+
+    // for tracking if the previous pair was above the line to avoid duplicate cuts
+    int ordinary_in_a_run = 0;
+    int compiler_in_a_run = 0;
+    int assembly_in_a_run = 0;
+
+    // to make sure width and height are provided
+    if (argument_count != 3) {
         fprintf(stderr, "usage: list_cuts width height < gray\n");
         return 2;
     }
-    width = atoi(argv[1]);
-    height = atoi(argv[2]);
+
+    // turn string arguments into integers
+    width = atoi(arguments[1]);
+    height = atoi(arguments[2]);
     if (width <= 0 || height <= 0) {
         fprintf(stderr, "bad size\n");
         return 2;
     }
-    npix = (size_t)width * (size_t)height;
-    limit = 2ull * (uint64_t)npix;
+
+    // how many pixels are in the frame
+    pixel_count = (size_t)width * (size_t)height;
+    cut_line = 2 * pixel_count;
+
+    /* FFmpeg pipes raw bytes. Text mode on Windows would change them. */
     _setmode(_fileno(stdin), _O_BINARY);
-    prev = (uint8_t *)malloc(npix);
-    curr = (uint8_t *)malloc(npix);
-    if (!prev || !curr) {
+
+    /* Two frame buffers are enough. They trade places after every pair. */
+    previous_frame = (uint8_t *)malloc(pixel_count);
+    current_frame = (uint8_t *)malloc(pixel_count);
+    if (!previous_frame || !current_frame) {
         fprintf(stderr, "out of memory\n");
         return 2;
     }
-    if (fread(prev, 1, npix, stdin) != npix) {
+
+    /* The first frame has no frame before it, so it only fills previous_frame. */
+    if (fread(previous_frame, 1, pixel_count, stdin) != pixel_count) {
         fprintf(stderr, "need at least one frame\n");
         return 2;
     }
-    while (fread(curr, 1, npix, stdin) == npix) {
-        uint64_t plain_sad = sad_plain(prev, curr, npix);
-        uint64_t auto_sad = sad_autovec(prev, curr, npix);
-        uint64_t avx_sad = sad_avx2_asm(prev, curr, npix);
-        uint8_t *swap;
+
+    /* Each pass reads one new frame and compares it with the frame before it. */
+    while (fread(current_frame, 1, pixel_count, stdin) == pixel_count) {
+        /* Absolute brightness change of this pair, from each kernel. */
+        uint64_t ordinary_sum = brightness_ordinary_c(previous_frame, current_frame, pixel_count);
+        uint64_t compiler_sum = brightness_compiler_c(previous_frame, current_frame, pixel_count);
+        uint64_t assembly_sum = brightness_avx2(previous_frame, current_frame, pixel_count);
+        uint8_t *held_frame;                /* keeps one buffer while the two pointers swap */
+
+        /* The second frame of the pair. Pair 1 is frame 1, so this
+           count is also the number of pairs at the end of the loop. */
         frame++;
-        if (plain_sad != auto_sad || plain_sad != avx_sad) {
+        /* The three kernels should return the same sum. */
+        if (ordinary_sum != compiler_sum || ordinary_sum != assembly_sum) {
             mismatches++;
         }
-        note(plain_cuts, &plain_n, &plain_run, frame, plain_sad > limit);
-        note(auto_cuts, &auto_n, &auto_run, frame, auto_sad > limit);
-        note(avx_cuts, &avx_n, &avx_run, frame, avx_sad > limit);
-        swap = prev;
-        prev = curr;
-        curr = swap;
+
+        /* Store the frame only when this pair is the first one above the cut line. */
+        mark_cut(ordinary_cuts, &ordinary_count, &ordinary_in_a_run, frame, ordinary_sum > cut_line);
+        mark_cut(compiler_cuts, &compiler_count, &compiler_in_a_run, frame, compiler_sum > cut_line);
+        mark_cut(assembly_cuts, &assembly_count, &assembly_in_a_run, frame, assembly_sum > cut_line);
+
+        /* The frame just read becomes the previous frame. */
+        held_frame = previous_frame;
+        previous_frame = current_frame;
+        current_frame = held_frame;
     }
+
+    /* "pairs 899 mismatches 0", then one cut line per kernel. */
     printf("pairs %d mismatches %d\n", frame, mismatches);
-    show("plain_c", plain_cuts, plain_n);
-    show("autovectorized_c", auto_cuts, auto_n);
-    show("avx2_asm", avx_cuts, avx_n);
-    free(prev);
-    free(curr);
+    print_cuts("brightness_ordinary_c", ordinary_cuts, ordinary_count);
+    print_cuts("brightness_compiler_c", compiler_cuts, compiler_count);
+    print_cuts("brightness_avx2", assembly_cuts, assembly_count);
+
+    /* Both buffers are finished. */
+    free(previous_frame);
+    free(current_frame);
+    /* 0 when the three sums agreed on every pair. */
     return mismatches == 0 ? 0 : 1;
 }

@@ -10,17 +10,17 @@
 #include <fcntl.h>
 #include <windows.h>
 
-uint64_t sad_plain(const uint8_t *a, const uint8_t *b, size_t n);
-uint64_t sad_autovec(const uint8_t *a, const uint8_t *b, size_t n);
-uint64_t sad_avx2_asm(const uint8_t *a, const uint8_t *b, size_t n);
+uint64_t brightness_ordinary_c(const uint8_t *a, const uint8_t *b, size_t n);
+uint64_t brightness_compiler_c(const uint8_t *a, const uint8_t *b, size_t n);
+uint64_t brightness_avx2(const uint8_t *a, const uint8_t *b, size_t n);
 
-typedef uint64_t (*sad_fn)(const uint8_t *a, const uint8_t *b, size_t n);
+typedef uint64_t (*brightness_fn)(const uint8_t *a, const uint8_t *b, size_t n);
 
 static double seconds_between(LARGE_INTEGER start, LARGE_INTEGER end, LARGE_INTEGER freq) {
     return (double)(end.QuadPart - start.QuadPart) / (double)freq.QuadPart;
 }
 
-static uint64_t pass(sad_fn fn, const uint8_t *frames, int nframes, size_t npix) {
+static uint64_t pass(brightness_fn fn, const uint8_t *frames, int nframes, size_t npix) {
     uint64_t sink = 0;
     int i;
     for (i = 1; i < nframes; i++) {
@@ -31,7 +31,7 @@ static uint64_t pass(sad_fn fn, const uint8_t *frames, int nframes, size_t npix)
     return sink;
 }
 
-static double time_pass(sad_fn fn, const uint8_t *frames, int nframes, size_t npix, LARGE_INTEGER freq) {
+static double time_pass(brightness_fn fn, const uint8_t *frames, int nframes, size_t npix, LARGE_INTEGER freq) {
     LARGE_INTEGER t0, t1;
     volatile uint64_t sink;
     QueryPerformanceCounter(&t0);
@@ -47,7 +47,7 @@ static int cmp_double(const void *a, const void *b) {
     return (da > db) - (da < db);
 }
 
-static void report(const char *name, sad_fn fn, const uint8_t *frames, int nframes, size_t npix, LARGE_INTEGER freq) {
+static void report(const char *name, brightness_fn fn, const uint8_t *frames, int nframes, size_t npix, LARGE_INTEGER freq) {
     double runs[5];
     int i;
     time_pass(fn, frames, nframes, npix, freq);
@@ -95,17 +95,17 @@ int main(int argc, char **argv) {
     for (i = 1; i < nframes; i++) {
         const uint8_t *prev = frames + (size_t)(i - 1) * npix;
         const uint8_t *curr = frames + (size_t)i * npix;
-        uint64_t plain = sad_plain(prev, curr, npix);
-        if (plain != sad_autovec(prev, curr, npix) || plain != sad_avx2_asm(prev, curr, npix)) {
+        uint64_t ordinary = brightness_ordinary_c(prev, curr, npix);
+        if (ordinary != brightness_compiler_c(prev, curr, npix) || ordinary != brightness_avx2(prev, curr, npix)) {
             mismatches++;
         }
     }
 
     QueryPerformanceFrequency(&freq);
     printf("pairs %d mismatches %d pixels %zu\n", nframes - 1, mismatches, npix);
-    report("plain_c", sad_plain, frames, nframes, npix, freq);
-    report("autovectorized_c", sad_autovec, frames, nframes, npix, freq);
-    report("avx2_asm", sad_avx2_asm, frames, nframes, npix, freq);
+    report("brightness_ordinary_c", brightness_ordinary_c, frames, nframes, npix, freq);
+    report("brightness_compiler_c", brightness_compiler_c, frames, nframes, npix, freq);
+    report("brightness_avx2", brightness_avx2, frames, nframes, npix, freq);
     free(frames);
     return mismatches == 0 ? 0 : 1;
 }

@@ -6,9 +6,9 @@ The course piece is the brightness sum, run three ways on the official clips. Th
 
 The sum is the absolute brightness change of every pixel, for every pair of frames, after the frames are in memory. Finding a cut is the first frame of a run whose mean absolute difference exceeds 2. That cut decides which eight frames may vote on the CRF. Encoding and VMAF stay outside the clock.
 
-- Plain C is that loop with the compiler's vectorizer off. Source: `src/sad_scalar.c`, compiled as `sad_plain`.
-- Compiler C is the same loop with AVX2 auto-vectorization on. The compiler widened the bytes. It did not emit the SAD instruction.
-- AVX2 is `src/sad_avx2.s`, 32 bytes per `vpsadbw`.
+- `brightness_ordinary_c` is that loop with the compiler's vectorizer off. Source: `src/brightness_c.c`.
+- `brightness_compiler_c` is the same source with AVX2 auto-vectorization on. The compiler widened the bytes. It did not emit the SAD instruction.
+- `brightness_avx2` is `src/brightness_avx2.asm`, 32 bytes per `vpsadbw`.
 
 ## Execution time
 
@@ -18,9 +18,9 @@ The clock is the sum only. Five runs, and the table keeps the median.
 
 | Version | Median | Speedup |
 |---|---:|---:|
-| Plain C | 1.259 s | 1 |
-| Compiler C | 0.537 s | 2.35× against plain |
-| AVX2 | 0.137 s | 3.91× against the compiler |
+| brightness_ordinary_c | 1.259 s | 1 |
+| brightness_compiler_c | 0.537 s | 2.35× against ordinary |
+| brightness_avx2 | 0.137 s | 3.91× against the compiler |
 
 One full VMAF pass of clip 01 at the settled CRF, CRF 31, took 22.0 s. It is in the timing table so the sum can be seen beside the score. It is not a speedup. Encoding time is not in the table. The rows are in `clips/timing.csv`.
 

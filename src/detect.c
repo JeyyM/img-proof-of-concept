@@ -10,7 +10,7 @@
 #include <io.h>
 #include <windows.h>
 
-static uint64_t sad_scalar(const uint8_t *a, const uint8_t *b, size_t n) {
+static uint64_t brightness_ordinary_c(const uint8_t *a, const uint8_t *b, size_t n) {
     uint64_t sum = 0;
     size_t i;
     for (i = 0; i < n; i++) {
@@ -20,9 +20,9 @@ static uint64_t sad_scalar(const uint8_t *a, const uint8_t *b, size_t n) {
     return sum;
 }
 
-uint64_t sad_avx2_asm(const uint8_t *a, const uint8_t *b, size_t n);
+uint64_t brightness_avx2(const uint8_t *a, const uint8_t *b, size_t n);
 
-static uint64_t sad_avx2(const uint8_t *a, const uint8_t *b, size_t n) {
+static uint64_t brightness_avx2_intrinsic(const uint8_t *a, const uint8_t *b, size_t n) {
     size_t i = 0;
     __m256i acc = _mm256_setzero_si256();
     uint64_t lanes[4];
@@ -96,27 +96,27 @@ int main(int argc, char **argv) {
         return 2;
     }
     QueryPerformanceFrequency(&freq);
-    printf("frame,sad,above\n");
+    printf("frame,brightness,above\n");
     while (fread(curr, 1, npix, in) == npix) {
-        uint64_t scalar_sad;
-        uint64_t avx_sad;
-        uint64_t asm_sad;
+        uint64_t ordinary;
+        uint64_t intrinsic;
+        uint64_t avx;
         int flag;
         frame++;
         QueryPerformanceCounter(&t0);
-        scalar_sad = sad_scalar(prev, curr, npix);
+        ordinary = brightness_ordinary_c(prev, curr, npix);
         scalar_sec += seconds_since(t0, freq);
         QueryPerformanceCounter(&t0);
-        avx_sad = sad_avx2(prev, curr, npix);
+        intrinsic = brightness_avx2_intrinsic(prev, curr, npix);
         avx_sec += seconds_since(t0, freq);
         QueryPerformanceCounter(&t0);
-        asm_sad = sad_avx2_asm(prev, curr, npix);
+        avx = brightness_avx2(prev, curr, npix);
         asm_sec += seconds_since(t0, freq);
-        if (scalar_sad != avx_sad || scalar_sad != asm_sad) {
+        if (ordinary != intrinsic || ordinary != avx) {
             mismatches++;
         }
-        flag = asm_sad > limit;
-        printf("%d,%llu,%d\n", frame, (unsigned long long)asm_sad, flag);
+        flag = avx > limit;
+        printf("%d,%llu,%d\n", frame, (unsigned long long)avx, flag);
         {
             uint8_t *swap = prev;
             prev = curr;
@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
         }
         (void)above;
     }
-    fprintf(stderr, "pairs %d mismatches %d scalar_s %.6f avx_s %.6f asm_s %.6f\n",
+    fprintf(stderr, "pairs %d mismatches %d ordinary_s %.6f intrinsic_s %.6f avx_s %.6f\n",
             frame, mismatches, scalar_sec, avx_sec, asm_sec);
     free(prev);
     free(curr);

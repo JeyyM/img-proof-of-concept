@@ -273,9 +273,9 @@ def course_line():
     with path.open(encoding="utf-8", newline="") as handle:
         for row in csv.DictReader(handle):
             medians[row["method"]] = float(row["median_s"])
-    plain = medians.get("plain_c")
-    compiler = medians.get("autovectorized_c")
-    avx = medians.get("avx2_asm")
+    plain = medians.get("brightness_ordinary_c")
+    compiler = medians.get("brightness_compiler_c")
+    avx = medians.get("brightness_avx2")
     if not (plain and compiler and avx):
         return ""
     return (
